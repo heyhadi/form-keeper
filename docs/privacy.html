@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>form-keeper privacy policy</title>
+    <link rel="icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="nav" aria-label="Main"><a class="brand" href="./"><img src="images/icon.png" alt="" />form-keeper</a></nav>
+      <main class="doc">
+        <h1>Privacy policy</h1>
+        <p class="muted">Last updated: 10 October 2026</p>
+
+        <p>form-keeper is a browser extension that saves what you type in web forms and restores it after a reload. This policy explains what it handles. The short version: <strong>everything stays in your browser, and nothing is sent to anyone.</strong></p>
+
+        <h2>What form-keeper stores</h2>
+        <ul>
+          <li>The values of form fields on pages where form-keeper is active (text you typed, boxes you ticked, options you chose), together with the page address (without its query string) and a label for each field.</li>
+          <li>Your settings: which sites you enabled, which you paused, and controls you taught it.</li>
+        </ul>
+        <p>This is stored with the browser's extension storage (<code>chrome.storage.local</code>) on your own computer.</p>
+
+        <h2>What it does not do</h2>
+        <ul>
+          <li>It does not send any data to the developer, to any server, or to any third party. The extension makes no network requests of its own.</li>
+          <li>It has no account system, no analytics, no advertising and no tracking.</li>
+          <li>It does not sell or share data, and does not use it for anything other than restoring your forms.</li>
+          <li>It never saves password fields, hidden fields, file inputs, credit card fields (<code>autocomplete="cc-…"</code>), or anything marked <code>data-form-keeper="off"</code>.</li>
+        </ul>
+
+        <h2>Where it runs</h2>
+        <p>By default only on development addresses (<code>localhost</code>, <code>127.0.0.1</code>, <code>*.localhost</code>, <code>*.local</code>). On any other site it runs only after you choose “Enable on this site” (or “all sites”) and your browser grants the permission. You can remove a site, or pause form-keeper on it, at any time from the popup.</p>
+
+        <h2>Permissions</h2>
+        <ul>
+          <li><strong>storage</strong>: keep saved forms and settings in your browser.</li>
+          <li><strong>activeTab</strong>: read the address of the tab you open the popup on, to offer “Enable on this site”.</li>
+          <li><strong>scripting</strong>: start working on a site right after you enable it, without a reload.</li>
+          <li><strong>Optional access to http and https sites</strong>: requested only when you enable a site.</li>
+        </ul>
+
+        <h2>Your control</h2>
+        <p>The popup lets you clear the saved data for a page or for everything. Removing the extension deletes all of its stored data.</p>
+
+        <h2>Changes and contact</h2>
+        <p>If this policy changes, the new version will be published here with a new date. Questions: please <a href="https://github.com/heyhadi/form-keeper/issues">open an issue</a>.</p>
+      </main>
+    </div>
+  </body>
+</html>

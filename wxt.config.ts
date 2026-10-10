@@ -14,7 +14,8 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'form-keeper',
-    description: 'Saves form state on dev hosts and restores it after reload.',
+    description: 'Saves what you type in forms and puts it back after a reload. Runs on dev sites by default; enable any site you choose.',
+    homepage_url: 'https://github.com/heyhadi/form-keeper',
     // activeTab: read the current tab's URL when the popup opens, to offer "Enable on this site".
     permissions: ['storage', 'scripting', 'activeTab'],
     // Requested at runtime, per site or for all sites, from the popup.

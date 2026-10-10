@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>form-keeper: reload without losing your forms</title>
+    <meta name="description" content="A browser extension that saves what you type in a form and puts it back after a reload. Works with React, Vue, Svelte and custom dropdowns and date pickers. Private and local." />
+    <link rel="icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <nav class="nav" aria-label="Main">
+          <a class="brand" href="./"><img src="images/icon.png" alt="" />form-keeper</a>
+          <div>
+            <a class="link" href="#install">Install</a>
+            <a class="link" href="#faq">FAQ</a>
+            <a class="link" href="https://github.com/heyhadi/form-keeper">GitHub</a>
+          </div>
+        </nav>
+        <div class="hero-grid">
+          <div>
+            <h1>Reload without losing your forms.</h1>
+            <p class="lead">form-keeper saves what you type and puts it back after a refresh, so a crash, a deploy or a stray click doesn't cost you the next ten minutes.</p>
+            <div class="btns">
+              <a class="btn btn-primary" href="https://github.com/heyhadi/form-keeper/releases/latest/download/form-keeper-chrome.zip">Download for Chrome</a>
+              <a class="btn btn-ghost" aria-disabled="true">Chrome Web Store <span class="badge">soon</span></a>
+            </div>
+            <p class="note">Free. Works in Chrome, Edge and Brave. Installs in about a minute: <a href="#install" style="color:#fff">see how</a>.</p>
+          </div>
+          <img class="shot" src="images/1-restores-your-form.png" width="1280" height="800" alt="A filled-in form after a page reload, with the form-keeper popup showing the restored fields" />
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="wrap">
+          <h2>Built for the forms that actually break.</h2>
+          <div class="features">
+            <div class="card"><h3>Saves as you type</h3><p>Text, checkboxes, radio buttons and dropdowns are kept automatically and filled back in on load, even on pages that render late.</p></div>
+            <div class="card"><h3>Works with modern sites</h3><p>Restored values reach React, Vue and Svelte, not just the screen, so the form really holds your data again.</p></div>
+            <div class="card"><h3>Even custom dropdowns</h3><p>Handles popular dropdown and date-picker libraries. For anything unusual, use it once and form-keeper learns it.</p></div>
+            <div class="card"><h3>Private by design</h3><p>Everything stays in your browser. Passwords, card numbers and hidden fields are never saved.</p></div>
+            <div class="card"><h3>Only where you allow</h3><p>It runs on development sites by default. Any other site needs your permission, one site at a time.</p></div>
+            <div class="card"><h3>See what it's doing</h3><p>The icon shows when it's active, and the popup lists what is saved and anything it couldn't restore.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" style="background: var(--surface)">
+        <div class="wrap">
+          <h2>Install in a minute</h2>
+          <p class="muted">The Chrome Web Store version is coming. Until then, this takes six clicks and no technical knowledge.</p>
+          <ol class="steps">
+            <li><div><h3>Download and unzip</h3><p><a href="https://github.com/heyhadi/form-keeper/releases/latest/download/form-keeper-chrome.zip">Download the zip</a>, then unzip it (Mac: double-click; Windows: right-click, Extract All). Keep the folder somewhere permanent, like Documents.</p></div></li>
+            <li><div><h3>Open the extensions page</h3><p>Paste <code>chrome://extensions</code> into the address bar and press Enter. (Edge: <code>edge://extensions</code>.)</p></div></li>
+            <li><div><h3>Turn on Developer mode</h3><p>The switch is at the top right. It's only needed to load an extension from a folder.</p></div></li>
+            <li><div><h3>Click “Load unpacked”</h3><p>Choose the unzipped folder, the one that contains <code>manifest.json</code>.</p></div></li>
+            <li><div><h3>Pin the icon</h3><p>Click the puzzle piece in the toolbar, then the pin next to form-keeper.</p></div></li>
+            <li><div><h3>Use it</h3><p>On a development site it works straight away. On any other site, click the icon and choose “Enable on this site”.</p></div></li>
+          </ol>
+          <p class="muted" style="margin-top:20px">More help, updating and troubleshooting: <a href="https://github.com/heyhadi/form-keeper/blob/main/INSTALL.md">full install guide</a>.</p>
+        </div>
+      </section>
+
+      <section>
+        <div class="wrap">
+          <h2>A closer look</h2>
+          <div class="gallery">
+            <figure><img src="images/2-dropdowns-and-pickers.png" width="1280" height="800" loading="lazy" alt="Dropdowns and switches from several UI libraries restored after a reload" /><figcaption>Dropdowns, switches and pickers from popular libraries, restored with nothing to configure.</figcaption></figure>
+            <figure><img src="images/3-fill-from-another-page.png" width="1280" height="800" loading="lazy" alt="The saved pages list with a Fill here button" /><figcaption>Every saved page is listed. Fill the form you're on from any of them.</figcaption></figure>
+            <figure><img src="images/4-teach-any-control.png" width="1280" height="800" loading="lazy" alt="Teach mode confirming it learned a custom dropdown" /><figcaption>Something unusual? Use it once and form-keeper learns it.</figcaption></figure>
+            <figure><img src="images/5-private-by-design.png" width="1280" height="800" loading="lazy" alt="Site settings showing where form-keeper runs" /><figcaption>Always on for development sites. Everything else is opt-in.</figcaption></figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" style="background: var(--surface)">
+        <div class="wrap" style="max-width: 760px">
+          <h2>Questions</h2>
+          <details><summary>Does it send my data anywhere?</summary><p>No. Saved forms live in your browser's local extension storage and are never sent to a server. form-keeper has no account, no analytics and no network requests of its own. See the <a href="privacy.html">privacy policy</a>.</p></details>
+          <details><summary>What does it never save?</summary><p>Password fields, hidden fields (often security tokens), file inputs, credit card fields, and anything you mark with <code>data-form-keeper="off"</code>.</p></details>
+          <details><summary>Why does it ask for access to other sites?</summary><p>It doesn't unless you ask it to. To use it on a site that isn't a development site, you press “Enable on this site” and your browser asks for permission for that site only. You can remove it again at any time in the popup's settings.</p></details>
+          <details><summary>A dropdown didn't come back. What now?</summary><p>Open the popup: it lists anything it couldn't restore and why. Press “Teach a control”, then use that dropdown once on the page. After that it is saved and restored like any other field.</p></details>
+          <details><summary>Is it free? Is the code public?</summary><p>Yes to both. The source is on <a href="https://github.com/heyhadi/form-keeper">GitHub</a>.</p></details>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>form-keeper · made by <a href="https://github.com/heyhadi">Hadi</a></span>
+        <span><a href="privacy.html">Privacy policy</a> · <a href="https://github.com/heyhadi/form-keeper/issues">Report a problem</a></span>
+      </div>
+    </footer>
+  </body>
+</html>
