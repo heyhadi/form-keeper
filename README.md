@@ -174,3 +174,7 @@ npm run zip          # production package for the Chrome Web Store / GitHub rele
   text is typed.
 - Teach mode handles dropdown-style controls; calendars and other multi-step pickers are not
   supported yet.
+
+## License
+
+[MIT](LICENSE) © Munawirul Hadi

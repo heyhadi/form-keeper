@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Chrome extension that saves form state on dev hosts and restores it after reload.",
   "private": true,
+  "license": "MIT",
+  "author": "Munawirul Hadi",
+  "repository": "github:heyhadi/form-keeper",
   "type": "module",
   "scripts": {
     "dev": "wxt",
