@@ -1,0 +1,7 @@
+node_modules
+.output
+.output-e2e
+.wxt
+test-results
+playwright-report
+.DS_Store

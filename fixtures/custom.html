@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Custom controls</title>
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      /* Deliberately unrecognisable: no roles, no ARIA, none of the usual class-name hints. */
+      .pk { position: relative; border: 1px solid #888; border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer; background: #fff; color: #000; }
+      .pk-pop { position: absolute; left: 0; top: 100%; z-index: 20; background: #fff; color: #000; border: 1px solid #888; min-width: 100%; }
+      .pk-pop[hidden] { display: none; }
+      .pk-row { padding: 0.3rem 0.6rem; }
+      .pk-row:hover { background: #e0e7ff; }
+      .portal-pop { position: absolute; z-index: 20; background: #fff; color: #000; border: 1px solid #888; }
+    </style>
+  </head>
+  <body>
+    <h1>Custom controls</h1>
+    <p><a href="/">← all fixtures</a> · dropdowns built from plain divs: nothing here follows a standard, so they need teaching.</p>
+    <form id="custom" onsubmit="return false">
+      <div class="field">
+        <label>Favourite city</label>
+        <div class="pk" id="city"><div class="pk-v">Pick one…</div><div class="pk-pop" hidden></div></div>
+      </div>
+      <div class="field">
+        <label>Favourite fruit (list opens in a portal)</label>
+        <div class="pk" id="fruit"><div class="pk-v">Pick one…</div></div>
+      </div>
+      <h2>State</h2>
+      <output data-testid="state"></output>
+    </form>
+    <script>
+      const state = { city: null, fruit: null };
+      const out = document.querySelector('output');
+      const show = () => (out.textContent = JSON.stringify(state));
+      show();
+
+      function dropdown(id, choices, { portal }) {
+        const box = document.getElementById(id);
+        const value = box.querySelector('.pk-v');
+        let pop = box.querySelector('.pk-pop');
+        const close = () => { if (portal) pop?.remove(), (pop = null); else pop.hidden = true; };
+        const choose = (text) => { value.textContent = text; state[id] = text; show(); close(); };
+        box.addEventListener('click', (e) => {
+          if (e.target.closest('.pk-pop')) return;
+          if (portal) {
+            if (pop) return close();
+            pop = document.createElement('div');
+            pop.className = 'portal-pop';
+            const r = box.getBoundingClientRect();
+            pop.style.cssText = `left:${r.left + scrollX}px;top:${r.bottom + scrollY}px;min-width:${r.width}px`;
+            document.body.append(pop);
+          } else {
+            pop.hidden = !pop.hidden;
+          }
+          pop.replaceChildren(...choices.map((c) => Object.assign(document.createElement('div'), { className: 'pk-row', textContent: c, onclick: () => choose(c) })));
+        });
+        if (!portal) pop.replaceChildren(...choices.map((c) => Object.assign(document.createElement('div'), { className: 'pk-row', textContent: c, onclick: () => choose(c) })));
+      }
+      dropdown('city', ['Singapore', 'Jakarta', 'Bangkok'], { portal: false });
+      dropdown('fruit', ['Mango', 'Durian', 'Rambutan'], { portal: true });
+    </script>
+  </body>
+</html>

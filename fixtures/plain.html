@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plain form</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <h1>Plain HTML form</h1>
+    <p><a href="/">← all fixtures</a></p>
+    <form id="profile" action="#">
+      <label>Name <input name="name" /></label>
+      <label>Email <input name="email" type="email" /></label>
+      <label>Start date <input name="start" type="date" /></label>
+      <label>Bio <textarea name="bio" rows="3"></textarea></label>
+      <fieldset>
+        <legend>Plan</legend>
+        <label><input type="radio" name="plan" value="free" checked /> Free</label>
+        <label><input type="radio" name="plan" value="pro" /> Pro</label>
+      </fieldset>
+      <fieldset>
+        <legend>Tags</legend>
+        <label><input type="checkbox" name="tags" value="frontend" /> Frontend</label>
+        <label><input type="checkbox" name="tags" value="backend" /> Backend</label>
+      </fieldset>
+      <label>Country
+        <select name="country"><option value="sg">Singapore</option><option value="id">Indonesia</option></select>
+      </label>
+      <label>Languages
+        <select name="langs" multiple><option value="ts">TypeScript</option><option value="go">Go</option><option value="rs">Rust</option></select>
+      </label>
+
+      <h2>Never saved</h2>
+      <label>Password <input name="password" type="password" /></label>
+      <label>Card number <input name="card" autocomplete="cc-number" /></label>
+      <label>Opted out <input name="secret" data-form-keeper="off" /></label>
+      <input type="hidden" name="csrf" value="server-token" />
+
+      <button type="submit">Submit</button>
+    </form>
+  </body>
+</html>
