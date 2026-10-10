@@ -25,9 +25,24 @@ export async function loadFields(page: string): Promise<SavedFields | undefined>
   return (await loadRecord(page))?.fields;
 }
 
+/** Same fields with every file's contents dropped, keeping names so the popup can say what was lost. */
+function withoutFileData(fields: SavedFields): SavedFields {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) =>
+      value.kind === 'file' ? [key, { ...value, files: value.files.map(({ data: _data, ...rest }) => ({ ...rest, skipped: rest.skipped ?? 'budget' })) }] : [key, value],
+    ),
+  );
+}
+
 export async function saveFields(page: string, fields: SavedFields): Promise<void> {
-  const record: PageRecord = { version: 1, savedAt: Date.now(), fields };
-  await browser.storage.local.set({ [pageStorageKey(page)]: record });
+  const write = (f: SavedFields) => browser.storage.local.set({ [pageStorageKey(page)]: { version: 1, savedAt: Date.now(), fields: f } satisfies PageRecord });
+  try {
+    await write(fields);
+  } catch (error) {
+    // Out of space (files are big): keep the form, forget the files, rather than losing everything.
+    if (!Object.values(fields).some((v) => v.kind === 'file')) throw error;
+    await write(withoutFileData(fields));
+  }
 }
 
 export async function clearPage(page: string): Promise<void> {

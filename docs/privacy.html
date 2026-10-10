@@ -12,13 +12,14 @@
       <nav class="nav" aria-label="Main"><a class="brand" href="./"><img src="images/icon.png" alt="" />form-keeper</a></nav>
       <main class="doc">
         <h1>Privacy policy</h1>
-        <p class="muted">Last updated: 10 October 2026</p>
+        <p class="muted">Last updated: 11 October 2026</p>
 
         <p>form-keeper is a browser extension that saves what you type in web forms and restores it after a reload. This policy explains what it handles. The short version: <strong>everything stays in your browser, and nothing is sent to anyone.</strong></p>
 
         <h2>What form-keeper stores</h2>
         <ul>
           <li>The values of form fields on pages where form-keeper is active (text you typed, boxes you ticked, options you chose), together with the page address (without its query string) and a label for each field.</li>
+          <li><strong>Files you attach</strong> in upload fields, so they can be attached again after a reload. This is on for development sites. On any other site you have enabled, files are saved only if you turn on “Save attached files on other sites” in the popup's settings. Files over 8 MB are remembered by name only.</li>
           <li>Your settings: which sites you enabled, which you paused, and controls you taught it.</li>
         </ul>
         <p>This is stored with the browser's extension storage (<code>chrome.storage.local</code>) on your own computer.</p>
@@ -36,7 +37,7 @@
 
         <h2>Permissions</h2>
         <ul>
-          <li><strong>storage</strong>: keep saved forms and settings in your browser.</li>
+          <li><strong>storage</strong> and <strong>unlimitedStorage</strong>: keep saved forms, settings and attached files in your browser, without the default size limit that attached files would quickly hit.</li>
           <li><strong>activeTab</strong>: read the address of the tab you open the popup on, to offer “Enable on this site”.</li>
           <li><strong>scripting</strong>: start working on a site right after you enable it, without a reload.</li>
           <li><strong>Optional access to http and https sites</strong>: requested only when you enable a site.</li>

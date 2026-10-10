@@ -3,13 +3,16 @@ import {
   activeStatus,
   DEFAULT_SITE_SETTINGS,
   DEV_HOST_MATCHES,
+  diagnose,
   INACTIVE_STATUS,
   isAllowedUrl,
   pageKey,
   pausedStatus,
   restoredStatus,
   getRecipes,
+  setFilesEnabled,
   setRecipes,
+  shouldSaveFiles,
   startKeeper,
   startTeaching,
   type Keeper,
@@ -34,7 +37,9 @@ export default defineContentScript({
     if (scope[RUNNING]) return;
     scope[RUNNING] = true;
 
-    if (!isAllowedUrl(location.href, await loadSettings())) return;
+    const initial = await loadSettings();
+    if (!isAllowedUrl(location.href, initial)) return;
+    setFilesEnabled(shouldSaveFiles(location.href, initial));
     const origin = location.origin;
     let keeper: Keeper | undefined;
     let lastReport: RestoreReport | undefined;
@@ -122,6 +127,8 @@ export default defineContentScript({
         case 'teach':
           teach();
           return null;
+        case 'diagnose':
+          return diagnose(document);
         case 'clearPage': {
           const page = keeper?.page() ?? pageKey(location.href);
           keeper?.forget();
@@ -143,7 +150,9 @@ export default defineContentScript({
       if (area !== 'local') return;
       const settings = changes[SETTINGS_KEY];
       if (settings) {
-        allowed = isAllowedUrl(location.href, (settings.newValue as SiteSettings | undefined) ?? DEFAULT_SITE_SETTINGS);
+        const next = { ...DEFAULT_SITE_SETTINGS, ...(settings.newValue as Partial<SiteSettings> | undefined) };
+        allowed = isAllowedUrl(location.href, next);
+        setFilesEnabled(shouldSaveFiles(location.href, next));
         if (!allowed) halt(INACTIVE_STATUS);
         else if (!keeper && !(await isPaused(origin))) resume();
       }

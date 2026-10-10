@@ -195,6 +195,14 @@ function Problems({ report }: { report?: RestoreReport }) {
 
 /** Teach mode entry point, and the controls already taught on this site. */
 function Taught({ data, onChange }: Props) {
+  const [copied, setCopied] = useState(false);
+  async function copyDiagnostics() {
+    const report = await askTab(data.tabId!, { type: 'diagnose' });
+    if (!report) return;
+    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 4000);
+  }
   async function teach() {
     await askTab(data.tabId!, { type: 'teach' });
     window.close(); // the popup would cover the page the user needs to click on
@@ -208,6 +216,9 @@ function Taught({ data, onChange }: Props) {
         </button>
         <span className="muted small">For custom dropdowns it doesn't recognise.</span>
       </div>
+      <button className="link" onClick={copyDiagnostics} title="Copies a description of what form-keeper found on this page, to paste into a bug report">
+        {copied ? 'Copied. Paste it into your bug report.' : 'Copy diagnostics'}
+      </button>
       {data.recipes.length > 0 && (
         <ul className="recipe-list">
           {data.recipes.map((recipe) => (

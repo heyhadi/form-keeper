@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { siteOf, type Recipe, type SiteSettings } from '@/core';
+import { DEFAULT_SITE_SETTINGS, siteOf, type Recipe, type SiteSettings } from '@/core';
 import type { TabState } from '@/messages';
 import { bytesInUse, listPages, loadRecipes, loadRecord, loadSettings, type PageRecord, type PageSummary } from '@/storage';
 import { getActiveTab, getTabState } from './api';
@@ -19,7 +19,7 @@ export interface PopupData {
   recipes: Recipe[];
 }
 
-const EMPTY: PopupData = { loading: true, pages: [], bytes: 0, settings: { allSites: false, sites: [] }, recipes: [] };
+const EMPTY: PopupData = { loading: true, pages: [], bytes: 0, settings: DEFAULT_SITE_SETTINGS, recipes: [] };
 
 export function usePopupData() {
   const [data, setData] = useState<PopupData>(EMPTY);

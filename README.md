@@ -34,7 +34,7 @@ Works in Chrome, Edge, Brave and other Chromium browsers.
 
 |  |  |
 |---|---|
-| **Saves as you type, restores on load.** Text, textareas, checkboxes, radios, selects. Forms that render late, and client-side routes, are covered. | **Works with your framework.** Restored values reach React, Vue and Svelte state, not just the screen. |
+| **Saves as you type, restores on load.** Text, textareas, checkboxes, radios, selects, and attached files and images. Forms that render late, and client-side routes, are covered. | **Works with your framework.** Restored values reach React, Vue and Svelte state, not just the screen. |
 | **Dropdowns and date pickers too.** react-select, Ant Design, MUI, Radix, Headless UI, react-datepicker and anything that follows the standard patterns. | **Teach it anything else.** Use an unusual control once and form-keeper learns how to save and restore it. |
 
 ![Dropdowns and date pickers restored](docs/images/2-dropdowns-and-pickers.png)
@@ -47,8 +47,11 @@ Works in Chrome, Edge, Brave and other Chromium browsers.
   page** and **Pause on this site**. *Saved pages* lists every saved URL, with search, a peek at
   the fields, delete, and **Fill here** to copy one page's values into the form you are on.
 - **Tells you what it could not restore,** and why.
+- **Remembers files.** Pick a profile photo or a document, reload, and it is attached again with
+  its preview. Always on for dev sites; on other sites it is a separate opt-in. Files over 8 MB
+  are remembered by name only.
 - **Private.** Everything stays in `chrome.storage.local`. Nothing is sent anywhere. Passwords,
-  hidden inputs (CSRF tokens), file inputs, `autocomplete="cc-*"` fields and anything inside
+  hidden inputs (CSRF tokens), `autocomplete="cc-*"` fields and anything inside
   `data-form-keeper="off"` are never saved. See the [privacy policy](docs/privacy.html).
 
 ![Reuse a form on any other page](docs/images/3-fill-from-another-page.png)
@@ -66,7 +69,7 @@ are listed in the popup and can be forgotten.
 
 | Permission | Why |
 |---|---|
-| `storage` | Keep saved forms in your browser. |
+| `storage`, `unlimitedStorage` | Keep saved forms, and the files you attach, in your browser. |
 | Content script on `localhost`, `127.0.0.1`, `*.localhost`, `*.local` | Read and fill form fields on development sites. |
 | `activeTab` | Learn the address of the tab you open the popup on, to offer "Enable on this site". |
 | `scripting` | Start on a site the moment you enable it, without a reload. |
@@ -96,8 +99,10 @@ with a real `click()`, because React drives their `onChange` from `click`. A tes
 during its own restore, and skips writes whose content matches what is already stored.
 
 **Late and conditional fields.** A MutationObserver watches for added fields, added `<option>`s
-and `disabled`/`readonly` changes, and retries only the fields still pending. It stops after 10
-seconds, or as soon as you start typing, so it never overwrites your input. Fields that are not
+and `disabled`/`readonly` changes, and retries only the fields still pending. Fields that depend on others (a dropdown disabled until
+another is set, whose options load from a server afterwards) give the page no signal when they
+become ready, so pending fields are also retried on a back-off timer. It stops after 15 seconds, or
+as soon as you start typing, so it never overwrites your input. Fields that are not
 on screen (another wizard step, a collapsed section) stay in storage instead of being dropped.
 
 **Single-page apps.** The current URL is checked on every edit and DOM change (plus `popstate`
@@ -131,8 +136,25 @@ popup. The background worker registers the content script for the granted sites 
 `chrome.scripting`, and the popup injects it into the open tab so it starts without a reload.
 Revoking access in Chrome's own settings removes the site here too.
 
-**Debugging a widget.** Set `localStorage['form-keeper:debug'] = '1'` on the page and the console
-logs what every widget attempt does.
+**File inputs.** Pages can't set a file input's value, but a script can assign `input.files` from a
+`DataTransfer`, which is how drag-and-drop works. form-keeper reads the bytes when a file is
+chosen (base64, in `chrome.storage.local`), rebuilds real `File` objects later, assigns them and
+fires `change`. The app then builds its previews as if the user had just picked the files. Hidden
+inputs behind a styled button work the same way. Limits: 8 MB per file, 20 MB per page; over that
+a file is remembered by name only and the popup says so. If storage runs out, the form is kept and
+only the files are dropped.
+
+**Older libraries.** Detection does not rely on one marker. A control counts as a dropdown if it has
+the ARIA `combobox` role, an `aria-haspopup="listbox"`, an `aria-autocomplete="list"` input, or
+react-select's `react-select-N-input` id, so react-select 1 to 4, which predate the ARIA roles, work
+too. Value elements are recognised both by react-select's own class names and by custom
+`classNamePrefix` variants.
+
+**Debugging a widget.** The popup's **Copy diagnostics** button copies a report of what form-keeper
+found on the page: every field and how it was read, the dropdown-looking elements nothing
+recognised, and the trimmed markup of each widget (typed values blanked). It is meant for pasting
+into a bug report. For a step-by-step trace, set `localStorage['form-keeper:debug'] = '1'` on the
+page and the console logs what every widget attempt does.
 
 ## Development
 
@@ -160,7 +182,7 @@ npm run zip          # production package for the Chrome Web Store / GitHub rele
 
 1. ~~Save and restore native fields~~
 2. ~~Late-rendered forms, Vue/Svelte, SPA routes, active indicator, popup, custom controls~~
-3. File and image inputs, rebuilt with `DataTransfer`
+3. ~~File and image inputs, rebuilt with `DataTransfer`~~
 4. Snapshot history: working draft, snapshots, dedupe, retention, pinning
 5. Side panel UI: browse, search, preview, restore
 6. URL pattern grouping (`/users/:id/edit`)
@@ -169,7 +191,10 @@ npm run zip          # production package for the Chrome Web Store / GitHub rele
 ## Known limits
 
 - Fields inside shadow DOM and iframes are not captured.
-- File inputs and drag-and-drop uploaders come in milestone 3.
+- Drop zones with no `<input type="file">` behind them (rare) are not captured; the common ones
+  (react-dropzone and similar) keep a hidden input and work.
+- There is no total storage cap yet; old pages and their files are removed from the popup
+  (**Clear all**). Automatic retention arrives with the history milestone.
 - Search boxes that load options from a server only restore if the option appears after the saved
   text is typed.
 - Teach mode handles dropdown-style controls; calendars and other multi-step pickers are not

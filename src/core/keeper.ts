@@ -1,4 +1,5 @@
 import { collectFields } from './collect';
+import { captureFiles } from './files';
 import { isExcluded, isFormControl } from './filters';
 import { pageKey } from './page';
 import { remapToPage } from './remap';
@@ -41,7 +42,14 @@ export interface Keeper {
 }
 
 export const DEFAULT_DEBOUNCE_MS = 300;
-export const DEFAULT_RESTORE_WINDOW_MS = 10_000;
+export const DEFAULT_RESTORE_WINDOW_MS = 15_000;
+/**
+ * Fields that depend on others (a city list that loads after a province is chosen) change nothing
+ * we can observe in the DOM when they become ready, so pending fields are also retried on a
+ * back-off timer. Spaced out so a dropdown that can never be filled is not opened and closed
+ * constantly in front of the user.
+ */
+export const RETRY_BACKOFF_MS = [400, 800, 1500, 2500, 4000];
 export const DEFAULT_SETTLE_MS = 50;
 
 interface RestoreRun {
@@ -49,9 +57,12 @@ interface RestoreRun {
   total: RestoreReport;
   windowTimer: ReturnType<typeof setTimeout>;
   attemptTimer?: ReturnType<typeof setTimeout>;
+  /** Back-off retry for fields that give no DOM signal when they become ready. */
+  retryTimer?: ReturnType<typeof setTimeout>;
   /** An attempt is in flight (widgets take real time); another request is queued behind it. */
   busy?: boolean;
   again?: boolean;
+  retries: number;
 }
 
 interface PageState {
@@ -150,13 +161,22 @@ export function startKeeper({
     if (restoring || !isFormControl(event.target) || isExcluded(event.target)) return;
     sync();
     const state = current;
-    // Once the user is typing, restoring further would overwrite their input.
-    endRestore(state);
-    // Serialize now rather than when the debounce fires: by then an SPA may have swapped the DOM
-    // for another page.
-    state.latest = serializeForm(root);
-    if (state.saveTimer !== undefined) clearTimeout(state.saveTimer);
-    state.saveTimer = setTimeout(() => void writeNow(state), debounceMs);
+    const target = event.target;
+
+    const commit = () => {
+      if (stopped) return;
+      // Once the user is typing, restoring further would overwrite their input.
+      endRestore(state);
+      // Serialize now rather than when the debounce fires: by then an SPA may have swapped the DOM
+      // for another page.
+      state.latest = serializeForm(root);
+      if (state.saveTimer !== undefined) clearTimeout(state.saveTimer);
+      state.saveTimer = setTimeout(() => void writeNow(state), debounceMs);
+    };
+
+    // A chosen file's bytes are read asynchronously; wait for them so the save includes them.
+    if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'file') void captureFiles(target as HTMLInputElement).then(commit);
+    else commit();
   }
 
   /**
@@ -191,6 +211,7 @@ export function startKeeper({
     state.restore = {
       pending: state.stored,
       total: { restored: [], unchanged: [], skipped: [], missing: [] },
+      retries: 0,
       windowTimer: setTimeout(() => endRestore(state), restoreWindowMs),
     };
     void attempt(state);
@@ -225,6 +246,15 @@ export function startKeeper({
     if (run.again) {
       run.again = false;
       void attempt(state);
+      return;
+    }
+    // Something is still pending: look again shortly, even if the page gives us no signal.
+    if (run.retryTimer === undefined) {
+      const wait = RETRY_BACKOFF_MS[Math.min(run.retries++, RETRY_BACKOFF_MS.length - 1)]!;
+      run.retryTimer = setTimeout(() => {
+        run.retryTimer = undefined;
+        void attempt(state);
+      }, wait);
     }
   }
 
@@ -234,6 +264,7 @@ export function startKeeper({
     state.restore = undefined;
     clearTimeout(run.windowTimer);
     if (run.attemptTimer !== undefined) clearTimeout(run.attemptTimer);
+    if (run.retryTimer !== undefined) clearTimeout(run.retryTimer);
     return run;
   }
 

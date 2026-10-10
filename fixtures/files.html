@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>File inputs</title>
+    <link rel="stylesheet" href="/style.css" />
+    <style>
+      .previews { display: flex; flex-wrap: wrap; gap: 8px; min-height: 64px; }
+      .previews img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid #aaa; }
+      .previews .doc { padding: 6px 10px; border: 1px solid #aaa; border-radius: 6px; }
+      .pick { display: inline-block; padding: 0.4rem 0.9rem; border: 1px solid #888; border-radius: 6px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <h1>File inputs</h1>
+    <p><a href="/">← all fixtures</a></p>
+    <form id="uploads" onsubmit="return false">
+      <div class="field">
+        <label for="avatar">Avatar (image, shows a preview)</label>
+        <input id="avatar" name="avatar" type="file" accept="image/*" />
+        <div class="previews" id="avatar-preview"></div>
+      </div>
+      <div class="field">
+        <label for="docs">Documents (multiple)</label>
+        <input id="docs" name="docs" type="file" multiple />
+        <div class="previews" id="docs-preview"></div>
+      </div>
+      <div class="field">
+        <span>Banner (the real input is hidden behind a styled button)</span>
+        <label class="pick" for="banner">Choose banner…</label>
+        <input id="banner" name="banner" type="file" accept="image/*" hidden />
+        <div class="previews" id="banner-preview"></div>
+      </div>
+      <h2>State</h2>
+      <output data-testid="state"></output>
+    </form>
+    <script>
+      // Like a real app: previews are built from input.files whenever it changes.
+      const state = {};
+      const out = document.querySelector('output');
+      function render(name) {
+        const input = document.getElementById(name);
+        const box = document.getElementById(name + '-preview');
+        box.replaceChildren();
+        const files = Array.from(input.files);
+        state[name] = files.map((f) => `${f.name}:${f.size}:${f.type}`);
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.alt = file.name;
+            box.append(img);
+          } else {
+            const doc = document.createElement('span');
+            doc.className = 'doc';
+            doc.textContent = file.name;
+            box.append(doc);
+          }
+        }
+        out.textContent = JSON.stringify(state);
+      }
+      for (const name of ['avatar', 'docs', 'banner']) {
+        document.getElementById(name).addEventListener('change', () => render(name));
+        state[name] = [];
+      }
+      out.textContent = JSON.stringify(state);
+    </script>
+  </body>
+</html>

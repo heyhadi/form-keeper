@@ -12,6 +12,7 @@
       .pk-pop[hidden] { display: none; }
       .pk-row { padding: 0.3rem 0.6rem; }
       .pk-row:hover { background: #e0e7ff; }
+      .pk-off { opacity: .55; cursor: not-allowed; }
       .portal-pop { position: absolute; z-index: 20; background: #fff; color: #000; border: 1px solid #888; }
     </style>
   </head>
@@ -27,11 +28,15 @@
         <label>Favourite fruit (list opens in a portal)</label>
         <div class="pk" id="fruit"><div class="pk-v">Pick one…</div></div>
       </div>
+      <div class="field">
+        <label>Area (needs a city first)</label>
+        <div class="pk pk-off" id="area"><div class="pk-v">Pick a city first…</div><div class="pk-pop" hidden></div></div>
+      </div>
       <h2>State</h2>
       <output data-testid="state"></output>
     </form>
     <script>
-      const state = { city: null, fruit: null };
+      const state = { city: null, fruit: null, area: null };
       const out = document.querySelector('output');
       const show = () => (out.textContent = JSON.stringify(state));
       show();
@@ -58,6 +63,30 @@
         });
         if (!portal) pop.replaceChildren(...choices.map((c) => Object.assign(document.createElement('div'), { className: 'pk-row', textContent: c, onclick: () => choose(c) })));
       }
+      // A dependent control: it ignores clicks (no ARIA, no standard disabled class) until a city
+      // is chosen, and only comes alive a moment later.
+      const AREAS = { Singapore: ['Orchard', 'Marina'], Jakarta: ['Menteng', 'Kemang'], Bangkok: ['Silom', 'Sukhumvit'] };
+      const area = document.getElementById('area');
+      const areaValue = area.querySelector('.pk-v');
+      const areaPop = area.querySelector('.pk-pop');
+      let areaChoices = [];
+      function fillArea() {
+        areaPop.replaceChildren(...areaChoices.map((c) => Object.assign(document.createElement('div'), { className: 'pk-row', textContent: c, onclick: () => { areaValue.textContent = c; state.area = c; show(); areaPop.hidden = true; } })));
+      }
+      area.addEventListener('click', (e) => {
+        if (area.classList.contains('pk-off') || e.target.closest('.pk-pop')) return;
+        areaPop.hidden = !areaPop.hidden;
+      });
+      document.getElementById('city').addEventListener('click', () => {
+        setTimeout(() => {
+          if (!state.city) return;
+          areaChoices = AREAS[state.city];
+          state.area = null;
+          areaValue.textContent = 'Pick one…';
+          fillArea();
+          setTimeout(() => area.classList.remove('pk-off'), 700);
+        }, 0);
+      });
       dropdown('city', ['Singapore', 'Jakarta', 'Bangkok'], { portal: false });
       dropdown('fruit', ['Mango', 'Durian', 'Rambutan'], { portal: true });
     </script>

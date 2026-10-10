@@ -34,6 +34,8 @@ export function collectFields(root: ParentNode): Field[] {
         radioGroups.set(groupKey, els);
         fields.push({ kind: 'radio', key: allocate(groupKey), els });
       }
+    } else if (type === 'file') {
+      fields.push({ kind: 'file', key: allocate(baseKey(el)), el: el as HTMLInputElement });
     } else if (type === 'checkbox') {
       fields.push({ kind: 'checkbox', key: allocate(baseKey(el)), el: el as HTMLInputElement });
     } else {

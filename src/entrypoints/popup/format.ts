@@ -49,6 +49,8 @@ export function previewValue(value: FieldValue): { text: string; empty: boolean 
       return value.value === null ? { text: 'none', empty: true } : { text: value.value, empty: false };
     case 'multi':
       return value.values.length ? { text: value.values.join(', '), empty: false } : { text: 'none', empty: true };
+    case 'file':
+      return value.files.length ? { text: value.files.map((f) => f.name).join(', '), empty: false } : { text: 'no file', empty: true };
     case 'widget':
       if (value.widget === 'toggle') return { text: value.labels[0] === 'on' ? 'on' : 'off', empty: value.labels[0] !== 'on' };
       return value.labels.length ? { text: value.labels.join(', ').slice(0, MAX_PREVIEW), empty: false } : { text: 'none', empty: true };
@@ -84,6 +86,7 @@ const REASONS: Record<string, string> = {
   disabled: 'field is disabled',
   readonly: 'field is read-only',
   'kind-mismatch': 'the field changed type',
+  'too-large': 'file too large to keep',
 };
 
 export function reasonText(reason: string): string {

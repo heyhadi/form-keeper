@@ -65,6 +65,7 @@ export default defineBackground(() => {
     const settings = await loadSettings();
     const revoked = new Set(origins);
     const next: SiteSettings = {
+      ...settings,
       allSites: settings.allSites && !origins.some((o) => o === 'http://*/*' || o === 'https://*/*'),
       sites: settings.sites.filter((site) => !revoked.has(`${site}/*`)),
     };

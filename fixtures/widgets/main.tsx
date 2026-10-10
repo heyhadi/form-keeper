@@ -6,6 +6,7 @@ import { StrictMode, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactDatePicker from 'react-datepicker';
 import ReactSelect from 'react-select';
+import ReactSelectV4 from 'react-select-v4';
 import MuiAutocomplete from '@mui/material/Autocomplete';
 import MuiMenuItem from '@mui/material/MenuItem';
 import MuiSelect from '@mui/material/Select';
@@ -18,6 +19,9 @@ import 'antd/dist/reset.css';
 
 const CITIES = ['Singapore', 'Jakarta', 'Kuala Lumpur', 'Bangkok'];
 const OPTIONS = CITIES.map((c) => ({ value: c.toLowerCase().replace(/ /g, '-'), label: c }));
+
+const PROVINCES = ['West Java', 'East Java'].map((p) => ({ value: p, label: p }));
+const CITIES_BY_PROVINCE: Record<string, string[]> = { 'West Java': ['Bandung', 'Bogor'], 'East Java': ['Surabaya', 'Malang'] };
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   // Deliberately no htmlFor: real apps often don't wire labels to widgets.
@@ -32,6 +36,26 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function App() {
   const [rsSingle, setRsSingle] = useState<(typeof OPTIONS)[number] | null>(null);
   const [rsMulti, setRsMulti] = useState<readonly (typeof OPTIONS)[number][]>([]);
+  // A dependent pair: the city list stays disabled until a province is chosen, then loads from a
+  // slow "server" (1.8 s), the way real admin forms behave.
+  const [province, setProvince] = useState<(typeof PROVINCES)[number] | null>(null);
+  const [city, setCity] = useState<{ value: string; label: string } | null>(null);
+  const [cityOptions, setCityOptions] = useState<{ value: string; label: string }[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const chooseProvince = (next: (typeof PROVINCES)[number] | null) => {
+    setProvince(next);
+    setCity(null);
+    setCityOptions([]);
+    if (!next) return;
+    // The field is enabled quickly, but its options arrive later: nothing in the DOM changes
+    // when they do, because the list is closed.
+    setLoadingCities(true);
+    setTimeout(() => setLoadingCities(false), 400);
+    setTimeout(() => setCityOptions((CITIES_BY_PROVINCE[next.value] ?? []).map((c) => ({ value: c, label: c }))), 1800);
+  };
+  const [rsV4, setRsV4] = useState<any>(null);
+  const [rsV4Multi, setRsV4Multi] = useState<readonly any[]>([]);
+  const [rsV4Prefixed, setRsV4Prefixed] = useState<any>(null);
   const [antSingle, setAntSingle] = useState<string>();
   const [antMulti, setAntMulti] = useState<string[]>([]);
   const [antDate, setAntDate] = useState<Dayjs | null>(null);
@@ -48,6 +72,11 @@ function App() {
   const state = {
     rsSingle: rsSingle?.label ?? null,
     rsMulti: rsMulti.map((o) => o.label),
+    province: province?.label ?? null,
+    city: city?.label ?? null,
+    rsV4: rsV4?.label ?? null,
+    rsV4Multi: rsV4Multi.map((o: any) => o.label),
+    rsV4Prefixed: rsV4Prefixed?.label ?? null,
     antSingle: OPTIONS.find((o) => o.value === antSingle)?.label ?? null,
     antMulti: antMulti.map((v) => OPTIONS.find((o) => o.value === v)?.label),
     antDate: antDate?.format('YYYY-MM-DD') ?? null,
@@ -70,6 +99,21 @@ function App() {
         </Field>
         <Field label="React Select (multi)">
           <ReactSelect isMulti options={OPTIONS} value={rsMulti} onChange={setRsMulti} />
+        </Field>
+        <Field label="Province">
+          <ReactSelect options={PROVINCES} value={province} onChange={chooseProvince} />
+        </Field>
+        <Field label="City (needs a province)">
+          <ReactSelect options={cityOptions} value={city} onChange={setCity} isDisabled={!province || loadingCities} isLoading={loadingCities} />
+        </Field>
+        <Field label="React Select v4 (legacy)">
+          <ReactSelectV4 options={OPTIONS} value={rsV4} onChange={setRsV4} />
+        </Field>
+        <Field label="React Select v4 (multi, legacy)">
+          <ReactSelectV4 isMulti options={OPTIONS} value={rsV4Multi} onChange={(v: any) => setRsV4Multi(v ?? [])} />
+        </Field>
+        <Field label="React Select v4 (custom class prefix)">
+          <ReactSelectV4 options={OPTIONS} value={rsV4Prefixed} onChange={setRsV4Prefixed} classNamePrefix="select" />
         </Field>
         <Field label="Ant Select (single)">
           <AntSelect style={{ width: '100%' }} options={OPTIONS} value={antSingle} onChange={setAntSingle} />

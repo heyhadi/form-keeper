@@ -30,9 +30,11 @@ export function pageKey(url: string): string {
 export interface SiteSettings {
   allSites: boolean;
   sites: string[];
+  /** Also save attached files on enabled sites. Dev hosts always do. */
+  saveFilesOnOtherSites: boolean;
 }
 
-export const DEFAULT_SITE_SETTINGS: SiteSettings = { allSites: false, sites: [] };
+export const DEFAULT_SITE_SETTINGS: SiteSettings = { allSites: false, sites: [], saveFilesOnOtherSites: false };
 
 /** `https://example.com:8443/a` -> `https://example.com`. Undefined for non-web URLs. */
 export function siteOf(url: string): string | undefined {
@@ -60,4 +62,9 @@ export function sitePattern(site: string): string {
 /** Match patterns for the dynamically registered content script (dev hosts are static). */
 export function userSiteMatches(settings: SiteSettings): string[] {
   return settings.allSites ? ALL_SITES_ORIGINS : settings.sites.map(sitePattern);
+}
+
+/** Files are saved on dev hosts, and elsewhere only when the user has opted in. */
+export function shouldSaveFiles(url: string, settings: SiteSettings): boolean {
+  return isDevHost(url) || settings.saveFilesOnOtherSites;
 }

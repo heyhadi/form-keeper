@@ -1,4 +1,5 @@
 import { collectFields } from './collect';
+import { attachFiles, sameFiles } from './files';
 import { effectiveLabels } from './widgets/baseline';
 import { setNativeValue, trace } from './widgets/interact';
 import { readField } from './serialize';
@@ -43,6 +44,15 @@ function applyField(field: Exclude<Field, { kind: 'widget' }>, saved: FieldValue
   if (el.disabled) return 'disabled';
 
   switch (field.kind) {
+    case 'file': {
+      const stored = (saved as Extract<FieldValue, { kind: 'file' }>).files;
+      if (sameFiles(field.el, stored.filter((f) => f.data !== undefined))) return stored.some((f) => f.skipped) && stored.every((f) => f.skipped) ? 'too-large' : 'unchanged';
+      if (!stored.some((f) => f.data !== undefined)) return stored.length ? 'too-large' : 'unchanged';
+      if (!attachFiles(field.el, stored)) return 'rejected';
+      fire(field.el, 'input', 'change');
+      return 'restored';
+    }
+
     case 'checkbox':
       return toggleTo(field.el, (saved as Extract<FieldValue, { kind: 'checkbox' }>).checked);
 

@@ -15,6 +15,50 @@ interface Case {
 
 const cases: Case[] = [
   {
+    name: 'a dropdown that is disabled until another is set, with options loaded later',
+    key: 'city',
+    expected: 'Malang',
+    async fill(page) {
+      await field(page, 'Province').locator('[class*="control"]').click();
+      await page.getByRole('option', { name: 'East Java' }).click();
+      // Wait for the "server" to answer and the city list to be enabled.
+      await expect(field(page, 'City (needs a province)').locator('[class*="control"][class*="disabled"]')).toHaveCount(0, { timeout: 5000 });
+      await page.waitForTimeout(1800); // options arrive after the field is enabled
+      await field(page, 'City (needs a province)').locator('[class*="control"]').click();
+      await page.getByRole('option', { name: 'Malang' }).click();
+    },
+  },
+  {
+    name: 'react-select v4 (older version, no ARIA roles)',
+    key: 'rsV4',
+    expected: 'Jakarta',
+    async fill(page) {
+      await field(page, 'React Select v4 (legacy)').locator('[class*="control"]').click();
+      await page.locator('[class*="option"]', { hasText: /^Jakarta$/ }).click();
+    },
+  },
+  {
+    name: 'react-select v4 multi',
+    key: 'rsV4Multi',
+    expected: ['Singapore', 'Bangkok'],
+    async fill(page) {
+      const f = field(page, 'React Select v4 (multi, legacy)');
+      await f.locator('[class*="control"]').click();
+      await page.locator('[class*="option"]', { hasText: /^Singapore$/ }).click();
+      await f.locator('[class*="control"]').click();
+      await page.locator('[class*="option"]', { hasText: /^Bangkok$/ }).click();
+    },
+  },
+  {
+    name: 'react-select v4 with a custom classNamePrefix',
+    key: 'rsV4Prefixed',
+    expected: 'Kuala Lumpur',
+    async fill(page) {
+      await field(page, 'React Select v4 (custom class prefix)').locator('.select__control').click();
+      await page.locator('.select__option', { hasText: /^Kuala Lumpur$/ }).click();
+    },
+  },
+  {
     name: 'react-select (single)',
     key: 'rsSingle',
     expected: 'Jakarta',
@@ -164,6 +208,7 @@ for (const c of cases) {
     await page.waitForTimeout(SETTLE_MS + 400);
 
     page = await reopen(context, URL);
-    await expect.poll(async () => (await state(page))[c.key], { timeout: 12_000, message: 'restored into the app state' }).toEqual(c.expected);
+    await expect.poll(async () => (await state(page))[c.key], { timeout: 15_000, message: 'restored into the app state' }).toEqual(c.expected);
+    if (c.key === 'city') expect((await state(page)).province).toBe('East Java');
   });
 }

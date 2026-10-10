@@ -12,6 +12,7 @@ export {
   isAllowedUrl,
   isDevHost,
   pageKey,
+  shouldSaveFiles,
   siteOf,
   sitePattern,
   userSiteMatches,
@@ -21,3 +22,5 @@ export { identityOf, remapToPage, type Remapped } from './remap';
 export { INACTIVE_STATUS, activeStatus, pausedStatus, restoredStatus, type TabStatus } from './status';
 export { getRecipes, locate as locateRecipe, setRecipes, type Recipe } from './widgets/learned';
 export { startTeaching, type TeachResult } from './widgets/recorder';
+export { captureFiles, filesEnabled, setFilesEnabled, MAX_FILE_BYTES, MAX_PAGE_BYTES } from './files';
+export { diagnose, type Diagnostics } from './diagnose';

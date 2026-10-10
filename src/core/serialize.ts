@@ -1,4 +1,5 @@
 import { collectFields } from './collect';
+import { describeFiles } from './files';
 import type { Field, FieldValue, SavedFields } from './types';
 import { effectiveLabels } from './widgets/baseline';
 
@@ -12,6 +13,8 @@ export function readField(field: Field): FieldValue {
       return { kind: 'radio', value: field.els.find((r) => r.checked)?.value ?? null };
     case 'multi':
       return { kind: 'multi', values: Array.from(field.el.selectedOptions, (o) => o.value) };
+    case 'file':
+      return { kind: 'file', files: describeFiles(field.el) };
     case 'widget':
       return { kind: 'widget', widget: field.adapter.id, labels: effectiveLabels(field.el, field.adapter.read(field.el)) };
   }

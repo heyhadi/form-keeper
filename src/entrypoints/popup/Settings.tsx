@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { DEV_HOST_MATCHES } from '@/core';
+import { saveSettings } from '@/storage';
 import { disableAllSites, disableSite, enableAllSites } from './api';
 import type { PopupData } from './usePopupData';
 
 export function Settings({ data, onChange }: { data: PopupData; onChange: () => Promise<void> }) {
   const [denied, setDenied] = useState(false);
   const hosts = DEV_HOST_MATCHES.map((m) => m.replace('*://', '').replace('/*', ''));
-  const { allSites, sites } = data.settings;
+  const { allSites, sites, saveFilesOnOtherSites } = data.settings;
 
   return (
     <section className="pad stack settings">
@@ -35,6 +36,23 @@ export function Settings({ data, onChange }: { data: PopupData; onChange: () => 
         </span>
       </label>
       {denied && <p className="small danger-text">Access wasn't granted, so nothing changed.</p>}
+
+      <label className="toggle row">
+        <input
+          type="checkbox"
+          checked={saveFilesOnOtherSites}
+          onChange={async (e) => {
+            await saveSettings({ ...data.settings, saveFilesOnOtherSites: e.target.checked });
+            await onChange();
+          }}
+        />
+        <span>
+          <strong>Save attached files on other sites</strong>
+          <span className="muted small block">
+            Files you choose in an upload field are kept on this computer so they can be re-attached. Always on for development sites.
+          </span>
+        </span>
+      </label>
 
       <div className="stack-sm">
         <h2 className="label">Enabled sites{sites.length > 0 && <span className="count">{sites.length}</span>}</h2>

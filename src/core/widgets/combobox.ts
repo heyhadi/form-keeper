@@ -9,12 +9,22 @@ import { focus, isVisible, normalize, pressKey, pressUntil, sleep, trace, typeIn
  * list of role=option elements, often rendered in a portal at the end of <body>.
  */
 
-const TRIGGER = '[role="combobox"], button[aria-haspopup="listbox"], [role="button"][aria-haspopup="listbox"]';
+/**
+ * Standard markup first. The extra entries are for older libraries that predate (or skip) the ARIA
+ * combobox role but still leave tell-tale attributes: react-select 1-4 (`react-select-N-input`),
+ * and anything with an autocomplete-list input or a listbox popup.
+ */
+const TRIGGER = [
+  '[role="combobox"]',
+  '[aria-haspopup="listbox"]',
+  'input[aria-autocomplete="list"]',
+  'input[id^="react-select-"][id$="-input"]',
+].join(', ');
 const GROUPING_STOP = 'label, [role="combobox"], select, textarea, input:not([type="hidden"]):not([aria-hidden="true"])';
 
 /** Elements that each stand for one chosen value, in the popular libraries and by convention. */
 const TOKEN =
-  '[class*="multiValue"]:not([class*="multiValue__"]), [class*="singleValue"], [class*="selection-item"]:not([class*="selection-item-"]), [class*="select-selection-item"], .MuiChip-root, [class*="chip" i]:not([class*="chip-"]), [class*="tag" i]:not([class*="tags"]):not([class*="tag-"]):not(svg)';
+  '[class*="multiValue"]:not([class*="multiValue__"]), [class*="singleValue"], [class*="multi-value"]:not([class*="multi-value__"]), [class*="single-value"], [class*="selection-item"]:not([class*="selection-item-"]), [class*="select-selection-item"], .MuiChip-root, [class*="chip" i]:not([class*="chip-"]), [class*="tag" i]:not([class*="tags"]):not([class*="tag-"]):not(svg)';
 const PLACEHOLDER = '[class*="placeholder" i], [data-placeholder], [aria-hidden="true"], svg, input, textarea, [role="img"], [role="button"], button, .MuiSelect-icon';
 
 /** Widget root for a trigger: the largest ancestor that still holds only this one control. */
@@ -198,10 +208,20 @@ async function choose(strategy: Strategy, trigger: HTMLElement, label: string, i
   return isSelected() || !option.isConnected;
 }
 
+/** Disabled by attribute, by ARIA, or by the class names libraries use (`is-disabled`, `--disabled`). */
+function isDisabledControl(root: HTMLElement, trigger: HTMLElement): boolean {
+  const flagged = '[disabled], [aria-disabled="true"], [class*="is-disabled" i], [class*="--disabled" i], [class*="-disabled" i], [class*="disabled" i]';
+  for (let el: HTMLElement | null = trigger; el; el = el.parentElement) {
+    if (el.matches(flagged)) return true;
+    if (el === root) break;
+  }
+  return root.matches(flagged);
+}
+
 export function writeCombobox(root: HTMLElement, trigger: HTMLElement, labels: string[], multiple: boolean, strategy: Strategy = ARIA_STRATEGY): Promise<WriteOutcome> {
   return (async () => {
     const doc = trigger.ownerDocument;
-    if (trigger.matches('[disabled], [aria-disabled="true"]')) return 'disabled';
+    if (isDisabledControl(root, trigger)) return 'disabled';
     const have = () => readCombobox(root).map((l) => l.toLowerCase());
     const missing = labels.filter((l) => !have().includes(normalize(l).toLowerCase()));
     if (labels.length && missing.length === 0 && have().length === labels.length) return 'unchanged';

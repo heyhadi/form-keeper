@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowedUrl, isDevHost, pageKey, siteOf, userSiteMatches } from '../src/core';
+import { DEFAULT_SITE_SETTINGS, isAllowedUrl, isDevHost, pageKey, shouldSaveFiles, siteOf, userSiteMatches } from '../src/core';
 
 describe('isDevHost', () => {
   it.each(['http://localhost:5173/x', 'http://127.0.0.1:3000/', 'https://app.localhost/', 'http://myapp.local/a'])(
@@ -20,7 +20,8 @@ describe('pageKey', () => {
 });
 
 describe('site settings', () => {
-  const none = { allSites: false, sites: [] };
+  const none = DEFAULT_SITE_SETTINGS;
+  const base = DEFAULT_SITE_SETTINGS;
 
   it('normalises a URL to protocol and hostname, any port', () => {
     expect(siteOf('https://app.example.com:8443/a?b')).toBe('https://app.example.com');
@@ -32,19 +33,25 @@ describe('site settings', () => {
   });
 
   it('allows enabled sites only, matching protocol', () => {
-    const settings = { allSites: false, sites: ['https://example.com'] };
+    const settings = { ...base, sites: ['https://example.com'] };
     expect(isAllowedUrl('https://example.com:8443/x', settings)).toBe(true);
     expect(isAllowedUrl('http://example.com/x', settings)).toBe(false);
     expect(isAllowedUrl('https://other.com/', settings)).toBe(false);
   });
 
   it('allows every web page when all sites is on', () => {
-    expect(isAllowedUrl('https://anything.io/', { allSites: true, sites: [] })).toBe(true);
-    expect(isAllowedUrl('file:///tmp/a.html', { allSites: true, sites: [] })).toBe(false);
+    expect(isAllowedUrl('https://anything.io/', { ...base, allSites: true })).toBe(true);
+    expect(isAllowedUrl('file:///tmp/a.html', { ...base, allSites: true })).toBe(false);
   });
 
   it('builds content-script match patterns', () => {
-    expect(userSiteMatches({ allSites: false, sites: ['https://example.com'] })).toEqual(['https://example.com/*']);
-    expect(userSiteMatches({ allSites: true, sites: ['https://example.com'] })).toEqual(['http://*/*', 'https://*/*']);
+    expect(userSiteMatches({ ...base, sites: ['https://example.com'] })).toEqual(['https://example.com/*']);
+    expect(userSiteMatches({ ...base, allSites: true, sites: ['https://example.com'] })).toEqual(['http://*/*', 'https://*/*']);
+  });
+
+  it('saves files on dev hosts always, and elsewhere only when opted in', () => {
+    expect(shouldSaveFiles('http://localhost:3000/', none)).toBe(true);
+    expect(shouldSaveFiles('https://example.com/', none)).toBe(false);
+    expect(shouldSaveFiles('https://example.com/', { ...none, saveFilesOnOtherSites: true })).toBe(true);
   });
 });

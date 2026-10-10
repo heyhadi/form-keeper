@@ -4,8 +4,20 @@ export type FieldValue =
   | { kind: 'checkbox'; checked: boolean }
   | { kind: 'radio'; value: string | null }
   | { kind: 'multi'; values: string[] }
+  /** Files chosen in an `<input type="file">`, kept as bytes so they can be re-attached. */
+  | { kind: 'file'; files: StoredFile[] }
   /** A custom control that is not a real form field. Stored as what the user sees: option labels. */
   | { kind: 'widget'; widget: string; labels: string[] };
+
+export interface StoredFile {
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+  /** Base64 file contents. Absent when the file was too big or the budget ran out. */
+  data?: string;
+  skipped?: 'too-large' | 'budget';
+}
 
 export type FieldKind = FieldValue['kind'];
 
@@ -19,6 +31,7 @@ export type Field =
   | { kind: 'checkbox'; key: string; el: HTMLInputElement }
   | { kind: 'radio'; key: string; els: HTMLInputElement[] }
   | { kind: 'multi'; key: string; el: HTMLSelectElement }
+  | { kind: 'file'; key: string; el: HTMLInputElement }
   | { kind: 'widget'; key: string; el: HTMLElement; adapter: WidgetAdapter };
 
 export type WriteOutcome = 'restored' | 'unchanged' | 'no-option' | 'rejected' | 'disabled';
@@ -35,7 +48,7 @@ export interface WidgetAdapter {
   anchor?(widget: HTMLElement): HTMLElement;
 }
 
-export type SkipReason = 'disabled' | 'readonly' | 'kind-mismatch' | 'no-option' | 'rejected';
+export type SkipReason = 'disabled' | 'readonly' | 'kind-mismatch' | 'no-option' | 'rejected' | 'too-large';
 
 export interface RestoreReport {
   /** Keys whose value we changed. */

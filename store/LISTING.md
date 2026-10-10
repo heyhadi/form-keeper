@@ -32,6 +32,7 @@ WHY IT'S DIFFERENT
 • Works with the frameworks you use. Restored values reach React, Vue and Svelte state, not just the screen, so the form really holds your data again.
 • Handles dropdowns and date pickers from popular libraries (react-select, Ant Design, MUI, Radix, Headless UI, react-datepicker and more) with nothing to configure.
 • Something unusual? Press "Teach a control", use it once, and form-keeper learns how to save and restore it.
+• Remembers files and images you attach in upload fields and attaches them again after a reload, so previews come back too.
 • Copes with real apps: forms that render late, options that load later, client-side navigation.
 
 SIMPLE TO USE
@@ -42,7 +43,7 @@ SIMPLE TO USE
 
 PRIVATE BY DESIGN
 • Everything stays in your browser. Nothing is sent to any server. No account, no analytics.
-• Never saves passwords, hidden fields, file inputs or card numbers.
+• Never saves passwords, hidden fields or card numbers. Attached files are kept only on dev sites unless you turn it on for others.
 • You choose where it runs, and can pause or remove a site at any time.
 
 Open source: https://github.com/heyhadi/form-keeper
@@ -67,6 +68,7 @@ Save the values a user types into web forms and restore them when the page is re
 | Permission | Justification |
 |---|---|
 | `storage` | Stores the saved form values, per-site settings and taught controls locally in the user's browser. |
+| `unlimitedStorage` | Files a user attaches to upload fields are stored locally so they can be re-attached after a reload; they exceed the default 10 MB quota quickly. Each file is capped at 8 MB and each page at 20 MB. |
 | `activeTab` | Reads the address of the current tab when the user opens the popup, to offer "Enable on this site" and show the saved forms for that page. |
 | `scripting` | Starts the content script on a site immediately after the user enables it, so no page reload is needed; also registers it for sites the user enabled. |
 | Host permissions (content script on `localhost`, `127.0.0.1`, `*.localhost`, `*.local`) | The core function: reading and filling form fields on development sites. |
@@ -75,7 +77,7 @@ Save the values a user types into web forms and restore them when the page is re
 **Remote code:** No. All code is in the package; nothing is fetched or evaluated at runtime.
 
 **Data usage** (answer to match the dashboard's current wording):
-- The extension handles *website content* (form field values) so it can restore it. It is stored locally on the user's device only and is never transmitted, sold, or used for anything else.
+- The extension handles *website content* (form field values and files the user attaches) so it can restore it. It is stored locally on the user's device only and is never transmitted, sold, or used for anything else.
 - It does not collect personally identifiable information, health, financial, authentication (passwords are explicitly never saved), location, web history, or user activity data for transmission.
 - Certify: not sold to third parties; not used for purposes unrelated to the single purpose; not used for creditworthiness or lending.
 

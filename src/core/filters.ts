@@ -1,13 +1,14 @@
+import { filesEnabled } from './files';
 import type { FormControl } from './types';
 
 /**
  * Input types we never capture. `hidden` usually carries CSRF tokens or server state that must
- * not be replayed; `file` is deferred to M3; the rest are buttons, not values.
+ * not be replayed; the rest are buttons, not values. File inputs are handled separately, and
+ * only where the user has allowed it.
  */
 export const EXCLUDED_INPUT_TYPES = new Set([
   'password',
   'hidden',
-  'file',
   'submit',
   'button',
   'reset',
@@ -38,5 +39,6 @@ export function isExcluded(el: FormControl): boolean {
   if (el.tagName === 'INPUT' && EXCLUDED_INPUT_TYPES.has((el as HTMLInputElement).type)) {
     return true;
   }
+  if (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'file' && !filesEnabled()) return true;
   return isCreditCardField(el) || el.closest(OPT_OUT_SELECTOR) !== null;
 }

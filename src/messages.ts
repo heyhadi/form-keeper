@@ -1,4 +1,4 @@
-import type { RestoreReport, TabStatus } from './core';
+import type { Diagnostics, RestoreReport, TabStatus } from './core';
 
 /** Content script -> background: update this tab's toolbar icon. */
 export interface StatusMessage {
@@ -14,7 +14,9 @@ export type TabRequest =
   /** Fill this page with values saved on another page. */
   | { type: 'restoreFrom'; page: string }
   /** Start teach mode on this page (the popup closes so the user can use the page). */
-  | { type: 'teach' };
+  | { type: 'teach' }
+  /** Describe what was found on this page, for troubleshooting. */
+  | { type: 'diagnose' };
 
 export type RestoreFromReport = RestoreReport & { unmatched: string[] };
 
@@ -32,4 +34,5 @@ export interface TabResponses {
   clearPage: null;
   restoreFrom: RestoreFromReport | null;
   teach: null;
+  diagnose: Diagnostics;
 }
