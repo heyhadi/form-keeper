@@ -52,15 +52,29 @@ function mouseInit(el: Element): MouseEventInit {
   };
 }
 
+/** Build an event, dropping optional members an environment rejects (jsdom is strict about `view`). */
+function makeEvent(Ctor: typeof MouseEvent, type: string, init: MouseEventInit & { pointerId?: number; pointerType?: string; isPrimary?: boolean }): Event {
+  try {
+    return new Ctor(type, init);
+  } catch {
+    const { view: _view, ...rest } = init;
+    try {
+      return new Ctor(type, rest);
+    } catch {
+      return new Event(type, { bubbles: true, cancelable: true });
+    }
+  }
+}
+
 function pointer(el: Element, type: string): void {
   const win = el.ownerDocument.defaultView as (Window & typeof globalThis) | null;
   const init = { ...mouseInit(el), pointerId: 1, pointerType: 'mouse', isPrimary: true };
-  const event = win && 'PointerEvent' in win ? new win.PointerEvent(type, init) : new MouseEvent(type, init);
-  el.dispatchEvent(event);
+  const Ctor = (win && 'PointerEvent' in win ? win.PointerEvent : MouseEvent) as typeof MouseEvent;
+  el.dispatchEvent(makeEvent(Ctor, type, init));
 }
 
 function mouse(el: Element, type: string): void {
-  el.dispatchEvent(new MouseEvent(type, mouseInit(el)));
+  el.dispatchEvent(makeEvent(MouseEvent, type, mouseInit(el)));
 }
 
 /** Mouse interaction split into phases, so callers can stop as soon as the widget reacts. */

@@ -6,7 +6,7 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig, type Plugin } from 'vite';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PAGES = ['index', 'plain', 'react', 'vue', 'svelte', 'spa', 'widgets', 'custom', 'files'];
+const PAGES = ['index', 'plain', 'react', 'vue', 'svelte', 'spa', 'widgets', 'custom', 'files', 'svelte-widgets'];
 
 /** Serves spa.html for every /spa/* path, like a real SPA host's history fallback. */
 const spaFallback: Plugin = {

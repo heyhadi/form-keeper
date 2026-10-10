@@ -2,7 +2,7 @@ import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOption
 import * as RadixSelect from '@radix-ui/react-select';
 import { DatePicker as AntDatePicker, Select as AntSelect, Switch as AntSwitch } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { StrictMode, useState, type ReactNode } from 'react';
+import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactDatePicker from 'react-datepicker';
 import ReactSelect from 'react-select';
@@ -22,6 +22,20 @@ const OPTIONS = CITIES.map((c) => ({ value: c.toLowerCase().replace(/ /g, '-'), 
 
 const PROVINCES = ['West Java', 'East Java'].map((p) => ({ value: p, label: p }));
 const CITIES_BY_PROVINCE: Record<string, string[]> = { 'West Java': ['Bandung', 'Bogor'], 'East Java': ['Surabaya', 'Malang'] };
+
+/** The markup and behaviour of a real admin form: Bootstrap-style wrapper, a prefixed react-select, options from an API. */
+function CmsSelect({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="row">
+      <div className="col">
+        <label className="form-label">{label}<span style={{ color: 'red' }}>*</span></label>
+        <div className="undefined CustomSelect">
+          <div style={{ position: 'relative' }}>{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   // Deliberately no htmlFor: real apps often don't wire labels to widgets.
@@ -53,6 +67,21 @@ function App() {
     setTimeout(() => setLoadingCities(false), 400);
     setTimeout(() => setCityOptions((CITIES_BY_PROVINCE[next.value] ?? []).map((c) => ({ value: c, label: c }))), 1800);
   };
+  // "Department" loads from a server after the page renders; "Team" depends on it.
+  const [departments, setDepartments] = useState<{ value: number; label: string }[]>([]);
+  const [department, setDepartment] = useState<{ value: number; label: string } | null>(null);
+  const [teams, setTeams] = useState<{ value: number; label: string }[]>([]);
+  const [team, setTeam] = useState<{ value: number; label: string } | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setDepartments([{ value: 1, label: 'Operations' }, { value: 2, label: 'Finance' }, { value: 3, label: 'Growth' }]), 900);
+    return () => clearTimeout(t);
+  }, []);
+  const chooseDepartment = (next: { value: number; label: string } | null) => {
+    setDepartment(next);
+    setTeam(null);
+    setTeams([]);
+    if (next) setTimeout(() => setTeams([{ value: 11, label: `${next.label} North` }, { value: 12, label: `${next.label} South` }]), 700);
+  };
   const [rsV4, setRsV4] = useState<any>(null);
   const [rsV4Multi, setRsV4Multi] = useState<readonly any[]>([]);
   const [rsV4Prefixed, setRsV4Prefixed] = useState<any>(null);
@@ -72,6 +101,8 @@ function App() {
   const state = {
     rsSingle: rsSingle?.label ?? null,
     rsMulti: rsMulti.map((o) => o.label),
+    department: department?.label ?? null,
+    team: team?.label ?? null,
     province: province?.label ?? null,
     city: city?.label ?? null,
     rsV4: rsV4?.label ?? null,
@@ -100,6 +131,12 @@ function App() {
         <Field label="React Select (multi)">
           <ReactSelect isMulti options={OPTIONS} value={rsMulti} onChange={setRsMulti} />
         </Field>
+        <CmsSelect label="Department">
+          <ReactSelect classNamePrefix="custom-select" placeholder="Select department" options={departments} value={department} onChange={chooseDepartment} />
+        </CmsSelect>
+        <CmsSelect label="Team">
+          <ReactSelect classNamePrefix="custom-select" placeholder="Select team" options={teams} value={team} onChange={setTeam} isDisabled={!department} />
+        </CmsSelect>
         <Field label="Province">
           <ReactSelect options={PROVINCES} value={province} onChange={chooseProvince} />
         </Field>

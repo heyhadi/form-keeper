@@ -105,6 +105,12 @@ become ready, so pending fields are also retried on a back-off timer. It stops a
 as soon as you start typing, so it never overwrites your input. Fields that are not
 on screen (another wizard step, a collapsed section) stay in storage instead of being dropped.
 
+**Forms that reset themselves.** Many apps re-initialise a form when their data arrives (Formik
+`enableReinitialize`, a refetched record), wiping what was just restored. After a successful
+restore form-keeper keeps checking for 8 seconds and puts back anything that reverted. The guard
+ends the moment a real person touches the page (events the extension dispatches itself are not
+trusted, so they never count), so it never overrides your own choices.
+
 **Single-page apps.** The current URL is checked on every edit and DOM change (plus `popstate`
 and the Navigation API). Fields are serialized when you type, not when the debounced write
 fires; otherwise a quick navigation would save the next route's form under the previous URL.
@@ -115,7 +121,10 @@ that fits:
 
 1. *Taught controls*, which always win over a guess.
 2. *Standards*: ARIA `combobox`/`listbox`/`option`, `role="switch"`/`checkbox`/`radiogroup`,
-   segmented date fields (`role="spinbutton"` parts) and `contenteditable` rich text.
+   segmented date fields (`role="spinbutton"` parts) and `contenteditable` rich text. Rows of
+   highlighted buttons ("chips", segmented controls) are read from `aria-pressed`, `data-state`, a
+   class such as `active`, or the buttons whose classes differ from the rest; a group only counts
+   when it has a label or sits in a form and is not navigation, pagination or a toolbar.
 3. *Plain interaction*: the value saved is what the user sees (the option's label), restored the
    way a person would: open it, find the option, click it. Clicks are tried as pointer events,
    then as a keyboard Enter, because some libraries (Radix, for one) only react to the latter.
@@ -143,6 +152,12 @@ fires `change`. The app then builds its previews as if the user had just picked 
 inputs behind a styled button work the same way. Limits: 8 MB per file, 20 MB per page; over that
 a file is remembered by name only and the popup says so. If storage runs out, the form is kept and
 only the files are dropped.
+
+**Finding the option to click.** Libraries rarely agree on option markup. form-keeper uses ARIA
+`option` elements when they exist and otherwise falls back to "whatever short text newly appeared
+after opening the control", ignoring screen-reader live regions. svelte-select, whose items are
+plain `list-item` elements with no role and no recognisable class, works this way with no special
+case.
 
 **Older libraries.** Detection does not rely on one marker. A control counts as a dropdown if it has
 the ARIA `combobox` role, an `aria-haspopup="listbox"`, an `aria-autocomplete="list"` input, or
@@ -199,6 +214,8 @@ npm run zip          # production package for the Chrome Web Store / GitHub rele
   text is typed.
 - Teach mode handles dropdown-style controls; calendars and other multi-step pickers are not
   supported yet.
+- A group of buttons with no label and outside any form is deliberately ignored, because clicking
+  it on restore could trigger actions.
 
 ## License
 

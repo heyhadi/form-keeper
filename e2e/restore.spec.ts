@@ -91,3 +91,32 @@ test('does nothing on non-dev hosts', async ({ context, worker }) => {
   await expect(page.locator('[name=name]')).toHaveValue('');
   expect(await badge(worker)).toBe('');
 });
+
+test('puts values back when the app resets its form after they were restored', async ({ context, worker }) => {
+  let page = await reopen(context, `${ORIGIN}/react.html`);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.fill('[name=name]', 'Hadi');
+  await page.fill('[name=email]', 'hadi@example.com');
+  await page.check('[value=pro]');
+  await page.selectOption('[name=country]', 'id');
+  await page.waitForTimeout(SETTLE_MS);
+
+  // This version of the page wipes its own form 2.5 s after load, long after the first restore.
+  page = await reopen(context, `${ORIGIN}/react.html?reset=2500`);
+  await page.waitForTimeout(5500);
+  const state = JSON.parse(await page.getByTestId('state').innerText());
+  expect(state).toMatchObject({ name: 'Hadi', email: 'hadi@example.com', plan: 'pro', country: 'id' });
+});
+
+test('does not fight the user: their edit after a restore is kept', async ({ context, worker }) => {
+  let page = await reopen(context, `${ORIGIN}/react.html`);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.fill('[name=name]', 'Hadi');
+  await page.waitForTimeout(SETTLE_MS);
+
+  page = await reopen(context, `${ORIGIN}/react.html`);
+  await expect(page.locator('[name=name]')).toHaveValue('Hadi');
+  await page.fill('[name=name]', 'Someone else');
+  await page.waitForTimeout(3000);
+  await expect(page.locator('[name=name]')).toHaveValue('Someone else');
+});

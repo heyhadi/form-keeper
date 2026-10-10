@@ -49,6 +49,13 @@ export const DEFAULT_RESTORE_WINDOW_MS = 15_000;
  * back-off timer. Spaced out so a dropdown that can never be filled is not opened and closed
  * constantly in front of the user.
  */
+/**
+ * Apps often reset a form once their data arrives (Formik `enableReinitialize`, a reloaded record),
+ * which wipes what we just restored. After a successful restore we keep checking for this long and
+ * put back anything that reverted, until the user touches the page.
+ */
+export const GUARD_MS = 8000;
+export const GUARD_INTERVAL_MS = 700;
 export const RETRY_BACKOFF_MS = [400, 800, 1500, 2500, 4000];
 export const DEFAULT_SETTLE_MS = 50;
 
@@ -75,6 +82,7 @@ interface PageState {
   latest?: SavedFields;
   saveTimer?: ReturnType<typeof setTimeout>;
   restore?: RestoreRun;
+  guard?: { timer: ReturnType<typeof setTimeout>; until: number };
 }
 
 const POKE_DELAY_MS = 150;
@@ -132,6 +140,7 @@ export function startKeeper({
     if (key === current.key) return;
     const previous = current;
     endRestore(previous);
+    stopGuard(previous);
     // `latest` was captured at edit time, so this writes the old page's fields even though the
     // DOM may already show the new page.
     void writeNow(previous);
@@ -165,6 +174,7 @@ export function startKeeper({
 
     const commit = () => {
       if (stopped) return;
+      stopGuard(state);
       // Once the user is typing, restoring further would overwrite their input.
       endRestore(state);
       // Serialize now rather than when the debounce fires: by then an SPA may have swapped the DOM
@@ -242,7 +252,11 @@ export function startKeeper({
     run.total.skipped = report.skipped;
     const retry = new Set([...report.missing, ...report.skipped.map((s) => s.key)]);
     run.pending = Object.fromEntries(Object.entries(run.pending).filter(([key]) => retry.has(key)));
-    if (retry.size === 0) return endRestore(state);
+    if (retry.size === 0) {
+      endRestore(state);
+      startGuard(state);
+      return;
+    }
     if (run.again) {
       run.again = false;
       void attempt(state);
@@ -256,6 +270,30 @@ export function startKeeper({
         void attempt(state);
       }, wait);
     }
+  }
+
+  function stopGuard(state: PageState): void {
+    if (state.guard) clearTimeout(state.guard.timer);
+    state.guard = undefined;
+  }
+
+  function startGuard(state: PageState): void {
+    stopGuard(state);
+    if (Object.keys(state.stored).length === 0) return;
+    const until = Date.now() + GUARD_MS;
+    const tick = async () => {
+      if (stopped || state !== current || !state.guard) return;
+      if (Date.now() > until) return stopGuard(state);
+      restoring = true;
+      try {
+        // Only fields that changed back produce events; matching fields are left alone.
+        await restoreAll(root, state.stored, () => stopped || !state.guard);
+      } finally {
+        restoring = false;
+      }
+      if (state.guard) state.guard.timer = setTimeout(tick, GUARD_INTERVAL_MS);
+    };
+    state.guard = { until, timer: setTimeout(tick, GUARD_INTERVAL_MS) };
   }
 
   function cancelRestore(state: PageState): RestoreRun | undefined {
@@ -291,6 +329,11 @@ export function startKeeper({
   const onFirstTouch = () => {
     if (!restoring && !stopped) collectFields(root);
   };
+  // A real person using the page ends the guard: from now on their choices win. Events we
+  // dispatch ourselves are not trusted, so they never end it.
+  const onUser = (event: Event) => {
+    if (event.isTrusted) stopGuard(current);
+  };
 
   const observer = new MutationObserver((records) => {
     sync();
@@ -323,6 +366,7 @@ export function startKeeper({
   root.addEventListener('change', onEdit, true);
   for (const type of ['click', 'keyup', 'focusout']) root.addEventListener(type, onPoke, true);
   for (const type of ['pointerdown', 'focusin']) root.addEventListener(type, onFirstTouch, true);
+  for (const type of ['pointerdown', 'keydown']) root.addEventListener(type, onUser, true);
   root.addEventListener('visibilitychange', onHide);
   win.addEventListener('pagehide', onHide);
   win.addEventListener('popstate', sync);
@@ -368,6 +412,7 @@ export function startKeeper({
     forget() {
       sync();
       cancelRestore(current);
+      stopGuard(current);
       if (current.saveTimer !== undefined) clearTimeout(current.saveTimer);
       current.saveTimer = undefined;
       current.latest = undefined;
@@ -376,6 +421,7 @@ export function startKeeper({
     },
     stop() {
       stopped = true;
+      stopGuard(current);
       observer.disconnect();
       if (scanTimer !== undefined) clearTimeout(scanTimer);
       cancelRestore(current);
@@ -384,6 +430,7 @@ export function startKeeper({
       root.removeEventListener('change', onEdit, true);
       for (const type of ['click', 'keyup', 'focusout']) root.removeEventListener(type, onPoke, true);
       for (const type of ['pointerdown', 'focusin']) root.removeEventListener(type, onFirstTouch, true);
+      for (const type of ['pointerdown', 'keydown']) root.removeEventListener(type, onUser, true);
       if (pokeTimer !== undefined) clearTimeout(pokeTimer);
       root.removeEventListener('visibilitychange', onHide);
       win.removeEventListener('pagehide', onHide);

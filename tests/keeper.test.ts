@@ -189,6 +189,34 @@ describe('restoring', () => {
   });
 });
 
+describe('guarding against form resets', () => {
+  it('puts a restored value back when the app wipes it shortly after', async () => {
+    start({ [`${ORIGIN}/form`]: { 'page name=a': text('saved') } });
+    await vi.advanceTimersByTimeAsync(100);
+    expect($('a').value).toBe('saved');
+
+    $('a').value = ''; // the app re-initialises its form once its data arrives
+    await vi.advanceTimersByTimeAsync(1500);
+    expect($('a').value).toBe('saved');
+  });
+
+  it('stops guarding as soon as the user edits, so their input wins', async () => {
+    start({ [`${ORIGIN}/form`]: { 'page name=a': text('saved') } });
+    await vi.advanceTimersByTimeAsync(100);
+    type('a', 'mine');
+    await vi.advanceTimersByTimeAsync(3000);
+    expect($('a').value).toBe('mine');
+  });
+
+  it('stops guarding after the guard window', async () => {
+    start({ [`${ORIGIN}/form`]: { 'page name=a': text('saved') } });
+    await vi.advanceTimersByTimeAsync(9500);
+    $('a').value = '';
+    await vi.advanceTimersByTimeAsync(2000);
+    expect($('a').value).toBe('');
+  });
+});
+
 describe('single-page-app navigation', () => {
   it('keeps each URL separate', async () => {
     const { storage, onPage } = start();

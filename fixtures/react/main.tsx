@@ -25,6 +25,15 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // `?reset=2000` simulates an app that re-initialises its form once its data arrives
+  // (Formik `enableReinitialize`, a refetched record), wiping whatever was restored before.
+  useEffect(() => {
+    const reset = Number(new URLSearchParams(location.search).get('reset') ?? 0);
+    if (!reset) return;
+    const timer = setTimeout(() => setValues(INITIAL), reset);
+    return () => clearTimeout(timer);
+  }, []);
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
     setSubmitted(values);

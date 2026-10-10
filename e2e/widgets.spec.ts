@@ -13,7 +13,23 @@ interface Case {
   fill(page: Page): Promise<void>;
 }
 
+const cmsField = (page: Page, label: string) => page.locator('.col', { has: page.locator('label.form-label', { hasText: label }) });
+
 const cases: Case[] = [
+  {
+    name: 'a prefixed react-select with API-loaded options and a dependent Team list (admin-form markup)',
+    key: 'team',
+    expected: 'Finance South',
+    async fill(page) {
+      await expect(page.locator('.custom-select__option, [class*="custom-select"]').first()).toBeVisible();
+      await page.waitForTimeout(1200); // departments arrive from the "server"
+      await cmsField(page, 'Department').locator('.custom-select__control').click();
+      await page.locator('.custom-select__option', { hasText: /^Finance$/ }).click();
+      await page.waitForTimeout(1200); // teams arrive after a department is chosen
+      await cmsField(page, 'Team').locator('.custom-select__control').click();
+      await page.locator('.custom-select__option', { hasText: /^Finance South$/ }).click();
+    },
+  },
   {
     name: 'a dropdown that is disabled until another is set, with options loaded later',
     key: 'city',
@@ -210,5 +226,6 @@ for (const c of cases) {
     page = await reopen(context, URL);
     await expect.poll(async () => (await state(page))[c.key], { timeout: 15_000, message: 'restored into the app state' }).toEqual(c.expected);
     if (c.key === 'city') expect((await state(page)).province).toBe('East Java');
+    if (c.key === 'team') expect((await state(page)).department).toBe('Finance');
   });
 }

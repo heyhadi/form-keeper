@@ -1,4 +1,5 @@
 import type { WidgetAdapter } from '../types';
+import { chipsAdapter } from './chips';
 import { comboboxAdapter } from './combobox';
 import { learnedAdapter } from './learned';
 import { richTextAdapter } from './richtext';
@@ -10,7 +11,7 @@ import { radioGroupAdapter, toggleAdapter } from './toggle';
  * target standards (ARIA roles, contenteditable) rather than single libraries, so unknown
  * libraries that follow them work without special cases.
  */
-export const ADAPTERS: WidgetAdapter[] = [learnedAdapter, segmentedDateAdapter, comboboxAdapter, radioGroupAdapter, toggleAdapter, richTextAdapter];
+export const ADAPTERS: WidgetAdapter[] = [learnedAdapter, segmentedDateAdapter, comboboxAdapter, radioGroupAdapter, toggleAdapter, chipsAdapter, richTextAdapter];
 
 export interface FoundWidget {
   el: HTMLElement;

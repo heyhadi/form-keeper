@@ -25,7 +25,7 @@ const GROUPING_STOP = 'label, [role="combobox"], select, textarea, input:not([ty
 /** Elements that each stand for one chosen value, in the popular libraries and by convention. */
 const TOKEN =
   '[class*="multiValue"]:not([class*="multiValue__"]), [class*="singleValue"], [class*="multi-value"]:not([class*="multi-value__"]), [class*="single-value"], [class*="selection-item"]:not([class*="selection-item-"]), [class*="select-selection-item"], .MuiChip-root, [class*="chip" i]:not([class*="chip-"]), [class*="tag" i]:not([class*="tags"]):not([class*="tag-"]):not(svg)';
-const PLACEHOLDER = '[class*="placeholder" i], [data-placeholder], [aria-hidden="true"], svg, input, textarea, [role="img"], [role="button"], button, .MuiSelect-icon';
+const PLACEHOLDER = '[class*="placeholder" i], [data-placeholder], [aria-hidden="true"], [aria-live], svg, input, textarea, [role="img"], [role="button"], button, .MuiSelect-icon';
 
 /** Widget root for a trigger: the largest ancestor that still holds only this one control. */
 export function rootOf(trigger: HTMLElement): HTMLElement {
@@ -66,9 +66,10 @@ export function readCombobox(root: HTMLElement): string[] {
   const fromTokens = tokens.map(tokenLabel).filter(Boolean);
   if (fromTokens.length) return fromTokens;
 
-  // An editable input holds the value as text (autocompletes, comboboxes).
+  // An editable input holds the value as text (autocompletes, comboboxes). When it is empty the
+  // choice may still be shown next to it (svelte-select), so fall through to what the control displays.
   const input = root.matches('input') ? (root as HTMLInputElement) : root.querySelector<HTMLInputElement>('input:not([type="hidden"]):not([aria-hidden="true"])');
-  if (input && !input.readOnly) return input.value ? [normalize(input.value)] : [];
+  if (input && !input.readOnly && input.value) return [normalize(input.value)];
 
   // Otherwise whatever text the control shows (MUI Select, Radix and Headless UI triggers).
   const shown = visibleText(root);
@@ -79,8 +80,10 @@ export function readCombobox(root: HTMLElement): string[] {
 export interface Strategy {
   /** Visible option elements for the list `trigger` opened, excluding anything in `stale`. */
   options(trigger: HTMLElement, stale?: Set<Element>): HTMLElement[];
-  /** Everything option-like on screen right now (used to wait for old popups to go away). */
+  /** Everything this strategy could mistake for an option on screen right now (the "stale" set). */
   snapshot(doc: Document): HTMLElement[];
+  /** Pop-up lists on screen, used to wait for an old popup to finish closing. */
+  popups(doc: Document): HTMLElement[];
   isOpen(trigger: HTMLElement, stale?: Set<Element>): boolean;
   /** True when this trigger is already holding its own list open (e.g. a multi-select mid-way). */
   heldOpen(trigger: HTMLElement): boolean;
@@ -108,6 +111,7 @@ export const ARIA_STRATEGY: Strategy = {
     return stale ? options.filter((o) => !stale.has(o)) : options;
   },
   snapshot: (doc) => ariaOptions(doc),
+  popups: (doc) => ariaOptions(doc),
   isOpen(trigger, stale) {
     return trigger.getAttribute('aria-expanded') === 'true' || this.options(trigger, stale).length > 0;
   },
@@ -115,6 +119,8 @@ export const ARIA_STRATEGY: Strategy = {
 };
 
 const TEXT_CANDIDATES = 'li, div, span, a, button, p, td, label, [role], [class*="item" i], [class*="option" i]';
+/** Text that is announced to screen readers or hidden from users, never an option. */
+const NOT_AN_OPTION = '[aria-live], [role="status"], [role="alert"], [role="log"], [aria-hidden="true"], [class*="a11y" i], [class*="sr-only" i], [class*="visually-hidden" i]';
 const MAX_OPTION_TEXT = 80;
 
 /**
@@ -125,7 +131,7 @@ export const TEXT_STRATEGY: Strategy = {
   options(trigger, stale) {
     const doc = trigger.ownerDocument;
     const texty = Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => {
-      if (trigger.contains(el) || el.contains(trigger) || (stale && stale.has(el))) return false;
+      if (trigger.contains(el) || el.contains(trigger) || (stale && stale.has(el)) || el.closest(NOT_AN_OPTION)) return false;
       const text = normalize(el.textContent);
       if (!text || text.length > MAX_OPTION_TEXT) return false;
       // Innermost element carrying the text, so we click the option and not its wrapper.
@@ -136,13 +142,33 @@ export const TEXT_STRATEGY: Strategy = {
   snapshot: (doc) =>
     Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => {
       const text = normalize(el.textContent);
-      return !!text && text.length <= MAX_OPTION_TEXT && isVisible(el);
+      return !!text && text.length <= MAX_OPTION_TEXT && isVisible(el) && !el.closest(NOT_AN_OPTION);
     }),
+  popups: () => [],
   // No aria-expanded to read: "open" means something new appeared.
   isOpen(trigger, stale) {
     return this.options(trigger, stale).length > 0;
   },
   heldOpen: () => false,
+};
+
+/**
+ * The default for dropdowns found by their markup: trust ARIA options when the library provides
+ * them, and otherwise fall back to "whatever text newly appeared". Libraries such as svelte-select
+ * render options as plain `list-item` elements with no role and no recognisable class, so the
+ * fallback is what makes them work without a special case.
+ */
+export const AUTO_STRATEGY: Strategy = {
+  options(trigger, stale) {
+    const aria = ARIA_STRATEGY.options(trigger, stale);
+    return aria.length ? aria : TEXT_STRATEGY.options(trigger, stale);
+  },
+  snapshot: (doc) => [...ARIA_STRATEGY.snapshot(doc), ...TEXT_STRATEGY.snapshot(doc)],
+  popups: (doc) => ARIA_STRATEGY.popups(doc),
+  isOpen(trigger, stale) {
+    return trigger.getAttribute('aria-expanded') === 'true' || this.options(trigger, stale).length > 0;
+  },
+  heldOpen: (trigger) => ARIA_STRATEGY.heldOpen(trigger),
 };
 
 function findOption(strategy: Strategy, trigger: HTMLElement, label: string, stale?: Set<Element>): HTMLElement | undefined {
@@ -164,7 +190,7 @@ async function open(strategy: Strategy, trigger: HTMLElement, stale: Set<Element
 }
 
 /** Waits until no option list is on screen, e.g. a previous dropdown finishing its close animation. */
-const quiet = (strategy: Strategy, doc: Document) => waitFor(() => strategy.snapshot(doc).length === 0, 800);
+const quiet = (strategy: Strategy, doc: Document) => waitFor(() => strategy.popups(doc).length === 0, 800);
 
 async function close(strategy: Strategy, trigger: HTMLElement, stale: Set<Element>): Promise<void> {
   const doc = trigger.ownerDocument;
@@ -218,7 +244,7 @@ function isDisabledControl(root: HTMLElement, trigger: HTMLElement): boolean {
   return root.matches(flagged);
 }
 
-export function writeCombobox(root: HTMLElement, trigger: HTMLElement, labels: string[], multiple: boolean, strategy: Strategy = ARIA_STRATEGY): Promise<WriteOutcome> {
+export function writeCombobox(root: HTMLElement, trigger: HTMLElement, labels: string[], multiple: boolean, strategy: Strategy = AUTO_STRATEGY): Promise<WriteOutcome> {
   return (async () => {
     const doc = trigger.ownerDocument;
     if (isDisabledControl(root, trigger)) return 'disabled';

@@ -5,3 +5,9 @@ declare module '*.vue' {
 }
 
 declare module 'react-select-v4';
+
+declare module '*.svelte' {
+  import type { Component } from 'svelte';
+  const component: Component;
+  export default component;
+}
