@@ -105,6 +105,12 @@ become ready, so pending fields are also retried on a back-off timer. It stops a
 as soon as you start typing, so it never overwrites your input. Fields that are not
 on screen (another wizard step, a collapsed section) stay in storage instead of being dropped.
 
+**Matching the saved choice to a menu option.** Menus rarely print a choice exactly as the control
+showed it. Comparison goes from strict to loose: exact, then ignoring case, accents, spaces and
+punctuation (`Trust & Safety ,` equals `trust safety`), then prefix and containment in both
+directions (a menu entry with a count, or a control that appended one). Among several loose hits
+the least embellished wins, and nothing is chosen when it would be a guess.
+
 **You always win.** After a reload form-keeper may spend several seconds filling dependent fields. A
 real person's interaction with a field ends that at once, aborts any dropdown it is driving, and is
 saved normally; form-keeper tells its own events apart from yours by tracking its own synchronous

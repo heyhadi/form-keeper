@@ -172,11 +172,49 @@ export const AUTO_STRATEGY: Strategy = {
   heldOpen: (trigger) => ARIA_STRATEGY.heldOpen(trigger),
 };
 
+/** Lower-case, accents removed, every run of punctuation/space collapsed: "Trust & Safety ," == "trust safety". */
+const squash = (text: string) =>
+  normalize(text)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/**
+ * Index of the option that best matches what was saved, or -1. Menus rarely print a choice exactly
+ * as the control displayed it (counts, codes, trailing punctuation, extra spaces), so try stricter
+ * comparisons first and only then looser ones, and never guess between several equally loose ones.
+ */
+export function bestMatch(optionTexts: string[], wanted: string): number {
+  const want = normalize(wanted).toLowerCase();
+  const wantSquashed = squash(wanted);
+  if (!wantSquashed) return -1;
+  const tiers: ((text: string, squashed: string) => boolean)[] = [
+    (text) => normalize(text).toLowerCase() === want,
+    (_, squashed) => squashed === wantSquashed,
+    (_, squashed) => squashed.startsWith(`${wantSquashed} `),
+    (_, squashed) => squashed.includes(wantSquashed),
+    // The menu shows less than the control did (the control appended a count or a code).
+    (_, squashed) => squashed.length >= 4 && wantSquashed.startsWith(`${squashed} `),
+  ];
+  const squashedTexts = optionTexts.map(squash);
+  for (const tier of tiers) {
+    const hits = optionTexts.map((text, i) => (tier(text, squashedTexts[i]!) ? i : -1)).filter((i) => i >= 0);
+    if (hits.length === 1) return hits[0]!;
+    if (hits.length > 1) {
+      // Several look equally good: take the shortest, which is the least-embellished one.
+      return hits.sort((x, y) => optionTexts[x]!.length - optionTexts[y]!.length)[0]!;
+    }
+  }
+  return -1;
+}
+
 function findOption(strategy: Strategy, trigger: HTMLElement, label: string, stale?: Set<Element>): HTMLElement | undefined {
   const options = strategy.options(trigger, stale);
-  const want = normalize(label).toLowerCase();
-  const text = (el: HTMLElement) => normalize(el.getAttribute('aria-label') ?? el.textContent).toLowerCase();
-  return options.find((o) => text(o) === want) ?? options.find((o) => text(o).startsWith(want)) ?? options.find((o) => text(o).includes(want));
+  const texts = options.map((el) => normalize(el.getAttribute('aria-label') ?? el.textContent));
+  const index = bestMatch(texts, label);
+  return index >= 0 ? options[index] : undefined;
 }
 
 async function open(strategy: Strategy, trigger: HTMLElement, stale: Set<Element>): Promise<boolean> {
@@ -220,7 +258,7 @@ async function choose(strategy: Strategy, trigger: HTMLElement, label: string, i
       option = await waitFor(() => findOption(strategy, trigger, label, stale), OPTION_WAIT_MS);
     }
   }
-  trace('option found:', !!option);
+  trace('option found:', !!option, option ? '' : `wanted ${JSON.stringify(label)} among ${JSON.stringify(strategy.options(trigger, stale).map((o) => normalize(o.textContent)).slice(0, 15))}`);
   if (!option) return false;
   const done = () => isSelected() || !option!.isConnected || !strategy.isOpen(trigger, stale) || !isVisible(option!);
   if (await pressUntil(option, done)) return true;
