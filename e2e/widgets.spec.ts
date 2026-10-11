@@ -229,3 +229,35 @@ for (const c of cases) {
     if (c.key === 'team') expect((await state(page)).department).toBe('Finance');
   });
 }
+
+test('choices made while a restore is still waiting on other fields are saved', async ({ context, worker }) => {
+  // First visit: choose a dropdown value so there is something saved for the page.
+  let page = await reopen(context, URL);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.waitForTimeout(300);
+  await field(page, 'React Select (single)').locator('[class*="control"]').click();
+  await page.getByRole('option', { name: 'Singapore' }).click();
+  await page.waitForTimeout(SETTLE_MS + 400);
+
+  // Pretend the saved form also holds a field that never shows up (like a dependent dropdown whose
+  // options are still loading), which keeps the restore pending for its whole window.
+  await worker.evaluate(async () => {
+    const all = await chrome.storage.local.get(null);
+    const key = Object.keys(all).find((k) => k.startsWith('page:') && k.endsWith('/widgets.html'))!;
+    const record = all[key] as { fields: Record<string, unknown> };
+    record.fields['form#widgets name=never-appears'] = { kind: 'text', value: 'x' };
+    await chrome.storage.local.set({ [key]: record });
+  });
+
+  // Second visit: the user is quick, and picks something else right away.
+  page = await reopen(context, URL);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.waitForTimeout(500);
+  await field(page, 'Ant Select (single)').locator('.ant-select').click();
+  await antdOption(page, 'Jakarta').click();
+  await page.waitForTimeout(SETTLE_MS + 400);
+
+  // Third visit, long after the pending window: the quick choice must have been saved.
+  page = await reopen(context, URL);
+  await expect.poll(async () => (await state(page)).antSingle, { timeout: 15_000 }).toBe('Jakarta');
+});

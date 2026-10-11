@@ -23,4 +23,5 @@ export { INACTIVE_STATUS, activeStatus, pausedStatus, restoredStatus, type TabSt
 export { getRecipes, locate as locateRecipe, setRecipes, type Recipe } from './widgets/learned';
 export { startTeaching, type TeachResult } from './widgets/recorder';
 export { captureFiles, filesEnabled, setFilesEnabled, MAX_FILE_BYTES, MAX_PAGE_BYTES } from './files';
-export { diagnose, type Diagnostics } from './diagnose';
+export { diagnose, withoutFileContents, type Diagnostics } from './diagnose';
+export { abortWidgets } from './widgets/interact';

@@ -1,5 +1,5 @@
 import type { WidgetAdapter, WriteOutcome } from '../types';
-import { fire, focus, sleep } from './interact';
+import { fire, focus, ours, sleep } from './interact';
 
 /** contenteditable boxes: Quill, Slate, Lexical, TipTap, ProseMirror, Draft.js and friends. */
 export const richTextAdapter: WidgetAdapter = {
@@ -22,8 +22,8 @@ export const richTextAdapter: WidgetAdapter = {
     const doc = el.ownerDocument;
     // Editing commands go through the browser's own input pipeline, so editor frameworks that
     // listen to `beforeinput` see a normal typing event and update their model.
-    doc.execCommand('selectAll', false);
-    let done = doc.execCommand('insertText', false, text);
+    ours(() => doc.execCommand('selectAll', false));
+    let done = ours(() => doc.execCommand('insertText', false, text));
     await sleep(30);
     if (!done || (el.innerText ?? '').trim() !== text) {
       // Fallback for editors that ignore execCommand: write the DOM and announce it.

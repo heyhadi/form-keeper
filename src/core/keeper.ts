@@ -2,6 +2,7 @@ import { collectFields } from './collect';
 import { captureFiles } from './files';
 import { isExcluded, isFormControl } from './filters';
 import { pageKey } from './page';
+import { abortWidgets, inOurDispatch } from './widgets/interact';
 import { remapToPage } from './remap';
 import { restoreAll } from './restore';
 import { serializeForm } from './serialize';
@@ -167,7 +168,8 @@ export function startKeeper({
   function onEdit(event: Event): void {
     // Our own restore fires input/change/click synchronously; ignoring them here is what keeps
     // restore -> event -> save from looping.
-    if (restoring || !isFormControl(event.target) || isExcluded(event.target)) return;
+    // Events from the page or from us during a restore are ignored; a real person's never are.
+    if (inOurDispatch() || (restoring && !event.isTrusted) || !isFormControl(event.target) || isExcluded(event.target)) return;
     sync();
     const state = current;
     const target = event.target;
@@ -196,21 +198,32 @@ export function startKeeper({
    * expected to differ from storage.
    */
   let pokeTimer: ReturnType<typeof setTimeout> | undefined;
-  function onPoke(): void {
-    if (restoring || stopped) return;
+  function onPoke(event: Event): void {
+    if (inOurDispatch() || (restoring && !event.isTrusted) || stopped) return;
     if (pokeTimer !== undefined) clearTimeout(pokeTimer);
     // Wait for the widget to finish rendering the new value.
-    pokeTimer = setTimeout(() => {
-      pokeTimer = undefined;
-      sync();
-      const state = current;
-      if (restoring || state.restore) return;
-      const fields = serializeForm(root);
-      const json = JSON.stringify({ ...state.stored, ...fields });
-      if (json === state.lastWritten) return;
-      state.latest = fields;
-      state.saveTimer = setTimeout(() => void writeNow(state), debounceMs);
-    }, POKE_DELAY_MS);
+    pokeTimer = setTimeout(checkPage, POKE_DELAY_MS);
+  }
+
+  function checkPage(): void {
+    pokeTimer = undefined;
+    if (stopped) return;
+    // Our own automated interaction is still winding down: look again shortly rather than
+    // dropping the change (a real person's choice must never be lost to our bookkeeping).
+    if (restoring) {
+      pokeTimer = setTimeout(checkPage, POKE_DELAY_MS);
+      return;
+    }
+    sync();
+    const state = current;
+    // While a restore is pending the page is expected to differ from storage, so a poke would
+    // save half-restored state. A person's own interaction ends the restore first (see `onUser`).
+    if (state.restore) return;
+    const fields = serializeForm(root);
+    const json = JSON.stringify({ ...state.stored, ...fields });
+    if (json === state.lastWritten) return;
+    state.latest = fields;
+    state.saveTimer = setTimeout(() => void writeNow(state), debounceMs);
   }
 
   function beginRestore(state: PageState): void {
@@ -237,6 +250,7 @@ export function startKeeper({
     }
     run.busy = true;
     restoring = true;
+    abortWidgets(false);
     let report: RestoreReport;
     try {
       report = await restoreAll(root, run.pending, () => state.restore !== run || stopped);
@@ -285,6 +299,7 @@ export function startKeeper({
       if (stopped || state !== current || !state.guard) return;
       if (Date.now() > until) return stopGuard(state);
       restoring = true;
+      abortWidgets(false);
       try {
         // Only fields that changed back produce events; matching fields are left alone.
         await restoreAll(root, state.stored, () => stopped || !state.guard);
@@ -332,8 +347,19 @@ export function startKeeper({
   // A real person using the page ends the guard: from now on their choices win. Events we
   // dispatch ourselves are not trusted, so they never end it.
   const onUser = (event: Event) => {
-    if (event.isTrusted) stopGuard(current);
+    if (!event.isTrusted || inOurDispatch()) return;
+    sync();
+    stopGuard(current);
+    if (restoring && isInsideField(event.target)) abortWidgets(true);
+    // Using a field means the user is in charge: stop filling things in around them, otherwise
+    // their choice would be ignored (and never saved) until the restore window ran out.
+    if (current.restore && isInsideField(event.target)) endRestore(current);
   };
+  function isInsideField(target: EventTarget | null): boolean {
+    if (!target || !('nodeType' in target)) return false;
+    const node = target as Node;
+    return collectFields(root).some((f) => (f.kind === 'radio' ? f.els.some((el) => el.contains(node)) : f.el.contains(node)));
+  }
 
   const observer = new MutationObserver((records) => {
     sync();
@@ -384,6 +410,7 @@ export function startKeeper({
       await state.ready;
       cancelRestore(state);
       restoring = true;
+      abortWidgets(false);
       let report: RestoreReport;
       try {
         report = await restoreAll(root, state.stored);
@@ -398,6 +425,7 @@ export function startKeeper({
       cancelRestore(current);
       const { fields, unmatched } = remapToPage(root, saved);
       restoring = true;
+      abortWidgets(false);
       let report: RestoreReport;
       try {
         report = await restoreAll(root, fields);

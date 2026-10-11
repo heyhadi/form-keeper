@@ -1,7 +1,9 @@
 import { collectFields } from './collect';
 import { isFormControl } from './filters';
 import { readField } from './serialize';
+import type { RestoreReport, SavedFields } from './types';
 import { findWidgets } from './widgets';
+import { getTrace } from './widgets/interact';
 
 export interface Diagnostics {
   /** Origin and path only; no query string. */
@@ -12,6 +14,14 @@ export interface Diagnostics {
   unrecognised: { tag: string; classes: string; role?: string; text: string }[];
   /** Trimmed markup of each recognised widget, to see which library built it. */
   widgetMarkup: { key: string; html: string }[];
+  /** Whether the window had focus when the report was made. */
+  windowHasFocus: boolean;
+  /** What the last restore did to each field, and why some failed. */
+  lastRestore?: RestoreReport;
+  /** What is saved for this page (file contents left out). */
+  saved?: SavedFields;
+  /** The latest widget interaction log, oldest first. */
+  trace: string[];
 }
 
 const MAX_HTML = 1800;
@@ -55,5 +65,16 @@ export function diagnose(root: Document): Diagnostics {
     fields: fields.map((f) => ({ key: f.key, kind: f.kind, adapter: f.kind === 'widget' ? f.adapter.id : undefined, value: readField(f) })),
     unrecognised,
     widgetMarkup: fields.flatMap((f) => (f.kind === 'widget' ? [{ key: f.key, html: sanitize(f.el) }] : [])),
+    windowHasFocus: root.hasFocus(),
+    trace: getTrace().slice(-150),
   };
+}
+
+/** Saved fields with file contents removed, so a report stays small and safe to paste. */
+export function withoutFileContents(saved: SavedFields): SavedFields {
+  return Object.fromEntries(
+    Object.entries(saved).map(([key, value]) =>
+      value.kind === 'file' ? [key, { ...value, files: value.files.map(({ data: _data, ...rest }) => rest) }] : [key, value],
+    ),
+  );
 }

@@ -4,6 +4,7 @@ import {
   DEFAULT_SITE_SETTINGS,
   DEV_HOST_MATCHES,
   diagnose,
+  withoutFileContents,
   INACTIVE_STATUS,
   isAllowedUrl,
   pageKey,
@@ -127,8 +128,11 @@ export default defineContentScript({
         case 'teach':
           teach();
           return null;
-        case 'diagnose':
-          return diagnose(document);
+        case 'diagnose': {
+          const page = keeper?.page() ?? pageKey(location.href);
+          const saved = await loadFields(page);
+          return { ...diagnose(document), lastRestore: lastReport, saved: saved && withoutFileContents(saved) };
+        }
         case 'clearPage': {
           const page = keeper?.page() ?? pageKey(location.href);
           keeper?.forget();

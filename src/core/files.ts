@@ -1,4 +1,5 @@
 import type { StoredFile } from './types';
+import { ours } from './widgets/interact';
 
 /**
  * File inputs. The browser never lets a page set a file input's value, but it does let a script
@@ -91,6 +92,8 @@ export function attachFiles(input: HTMLInputElement, stored: StoredFile[]): bool
     transfer.items.add(toFile(file));
     bytes.set(signature(file), file.data!); // so the next save keeps them
   }
-  input.files = transfer.files;
+  ours(() => {
+    input.files = transfer.files;
+  });
   return input.files?.length === transfer.files.length;
 }

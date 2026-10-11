@@ -1,7 +1,7 @@
 import { collectFields } from './collect';
 import { attachFiles, sameFiles } from './files';
 import { effectiveLabels } from './widgets/baseline';
-import { setNativeValue, trace } from './widgets/interact';
+import { fire as fireEvents, ours, setNativeValue, trace } from './widgets/interact';
 import { readField } from './serialize';
 import type { Field, FieldValue, RestoreReport, SavedFields, SkipReason, WriteOutcome } from './types';
 
@@ -9,9 +9,7 @@ type Outcome = 'restored' | 'unchanged' | SkipReason;
 
 export { setNativeValue };
 
-function fire(el: Element, ...types: string[]): void {
-  for (const type of types) el.dispatchEvent(new Event(type, { bubbles: true }));
-}
+const fire = fireEvents;
 
 /**
  * Checkboxes and radios are toggled with a real `click()`: it flips `checked` and fires `click`,
@@ -20,7 +18,7 @@ function fire(el: Element, ...types: string[]): void {
  */
 function toggleTo(el: HTMLInputElement, checked: boolean): Outcome {
   if (el.checked === checked) return 'unchanged';
-  el.click();
+  ours(() => el.click());
   // A page handler can cancel the click; report it instead of claiming success.
   return el.checked === checked ? 'restored' : 'rejected';
 }
@@ -74,7 +72,9 @@ function applyField(field: Exclude<Field, { kind: 'widget' }>, saved: FieldValue
       const wanted = new Set((saved as Extract<FieldValue, { kind: 'multi' }>).values);
       const options = Array.from(field.el.options);
       if (options.every((o) => o.selected === wanted.has(o.value))) return 'unchanged';
-      for (const option of options) option.selected = wanted.has(option.value);
+      ours(() => {
+        for (const option of options) option.selected = wanted.has(option.value);
+      });
       fire(field.el, 'input', 'change');
       return 'restored';
     }
@@ -105,7 +105,9 @@ export function restoreForm(root: ParentNode, saved: SavedFields): RestoreReport
     if (!value) continue;
     seen.add(field.key);
     if (field.kind === 'widget') continue;
-    record(report, field.key, applyField(field, value));
+    const outcome = applyField(field, value);
+    if (outcome !== 'unchanged') trace('field', field.key, '->', outcome);
+    record(report, field.key, outcome);
   }
 
   report.missing = Object.keys(saved).filter((key) => !seen.has(key));

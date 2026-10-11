@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { diagnose } from '../src/core';
+import { diagnose, withoutFileContents } from '../src/core';
+import { trace } from '../src/core/widgets/interact';
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -23,5 +24,21 @@ describe('diagnose', () => {
     // Typed values in the markup are blanked.
     expect(JSON.stringify(report.widgetMarkup)).not.toContain('secret@example.com');
     expect(report.page).toMatch(/^https?:\/\/[^?]*$/);
+  });
+
+  it('includes the recent interaction trace and whether the window had focus', () => {
+    trace('choose', 'Jakarta', { expanded: false });
+    const report = diagnose(document);
+    expect(report.trace.at(-1)).toMatch(/choose Jakarta \{"expanded":false\}$/);
+    expect(typeof report.windowHasFocus).toBe('boolean');
+  });
+
+  it('leaves file contents out of the saved fields', () => {
+    const saved = withoutFileContents({
+      'page name=a': { kind: 'file', files: [{ name: 'x.png', type: 'image/png', size: 3, lastModified: 1, data: 'AAAA' }] },
+      'page name=b': { kind: 'text', value: 'keep' },
+    });
+    expect(JSON.stringify(saved)).not.toContain('AAAA');
+    expect(saved['page name=b']).toEqual({ kind: 'text', value: 'keep' });
   });
 });

@@ -47,7 +47,7 @@ function visibleText(el: Element): string {
   let text = '';
   const walk = (node: Node) => {
     if (node.nodeType === 3) text += node.textContent;
-    else if (node.nodeType === 1 && !(node as Element).matches(PLACEHOLDER) && isVisible(node as Element)) node.childNodes.forEach(walk);
+    else if (node.nodeType === 1 && !(node as Element).matches(PLACEHOLDER) && isVisible(node as Element, { opacity: false })) node.childNodes.forEach(walk);
   };
   el.childNodes.forEach(walk);
   return normalize(text);
@@ -91,7 +91,7 @@ export interface Strategy {
 
 function ariaOptions(doc: Document, scopes: ParentNode[] = [doc]): HTMLElement[] {
   const options = scopes.flatMap((scope) => Array.from(scope.querySelectorAll<HTMLElement>('[role="option"], [role="menuitem"], [role="menuitemradio"]')));
-  const visible = options.filter(isVisible);
+  const visible = options.filter((el) => isVisible(el));
   if (visible.length) return visible;
   // Libraries that don't set roles on visible items: fall back to class-name hints.
   return Array.from(doc.querySelectorAll<HTMLElement>('[class*="option" i], [class*="select-item"], [class*="dropdown-item" i], [class*="menu-item" i]')).filter(
@@ -118,6 +118,7 @@ export const ARIA_STRATEGY: Strategy = {
   heldOpen: (trigger) => trigger.getAttribute('aria-expanded') === 'true',
 };
 
+const OPTION_WAIT_MS = 1500;
 const TEXT_CANDIDATES = 'li, div, span, a, button, p, td, label, [role], [class*="item" i], [class*="option" i]';
 /** Text that is announced to screen readers or hidden from users, never an option. */
 const NOT_AN_OPTION = '[aria-live], [role="status"], [role="alert"], [role="log"], [aria-hidden="true"], [class*="a11y" i], [class*="sr-only" i], [class*="visually-hidden" i]';
@@ -208,14 +209,15 @@ async function choose(strategy: Strategy, trigger: HTMLElement, label: string, i
   const opened = await open(strategy, trigger, stale);
   trace('opened:', opened, 'options:', strategy.options(trigger, stale).map((o) => normalize(o.textContent)).slice(0, 12));
   if (!opened) return false;
-  let option = await waitFor(() => findOption(strategy, trigger, label, stale), 300);
+  // Lists are often fetched when the control opens, so give them time to arrive.
+  let option = await waitFor(() => findOption(strategy, trigger, label, stale), OPTION_WAIT_MS);
   if (!option) {
     // Long or virtualised lists: narrow them by typing, if there is somewhere to type.
     const input = trigger.matches('input') ? (trigger as HTMLInputElement) : trigger.querySelector<HTMLInputElement>('input:not([type="hidden"])') ?? trigger.parentElement?.querySelector<HTMLInputElement>('input:not([type="hidden"])');
     if (input && !input.readOnly) {
       focus(input);
       typeInto(input, label);
-      option = await waitFor(() => findOption(strategy, trigger, label, stale), 600);
+      option = await waitFor(() => findOption(strategy, trigger, label, stale), OPTION_WAIT_MS);
     }
   }
   trace('option found:', !!option);

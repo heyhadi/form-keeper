@@ -2,10 +2,37 @@
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Set when a real person starts using the page while we are driving a widget. Every wait and
+ * press loop here gives up straight away, so we stop clicking around under their hands.
+ */
+/**
+ * Events our own dispatches cause, even ones the browser flags as trusted (the `input`/`change`
+ * a scripted `click()` on a checkbox produces), happen synchronously inside the dispatch. Anything
+ * observed while this is positive is ours, not a person's.
+ */
+let ownDispatch = 0;
+export function ours<T>(fn: () => T): T {
+  ownDispatch++;
+  try {
+    return fn();
+  } finally {
+    ownDispatch--;
+  }
+}
+export const inOurDispatch = () => ownDispatch > 0;
+
+let aborted = false;
+export const abortWidgets = (value: boolean): void => {
+  aborted = value;
+};
+export const widgetsAborted = () => aborted;
+
 /** Polls `check` until it returns something truthy or the timeout passes. */
 export async function waitFor<T>(check: () => T | undefined | null | false, timeoutMs: number, intervalMs = 30): Promise<T | undefined> {
   const end = Date.now() + timeoutMs;
   for (;;) {
+    if (aborted) return undefined;
     const value = check();
     if (value) return value;
     if (Date.now() >= end) return undefined;
@@ -27,11 +54,11 @@ export function normalize(text: string | null | undefined): string {
  * of the window is still visible: the page can scroll to it. jsdom has no layout, so there
  * everything not explicitly hidden counts as visible.
  */
-export function isVisible(el: Element): boolean {
+export function isVisible(el: Element, { opacity = true }: { opacity?: boolean } = {}): boolean {
   if (el.closest('[hidden], [aria-hidden="true"], [inert]')) return false;
   const doc = el.ownerDocument;
   const check = (el as Element & { checkVisibility?: (o: object) => boolean }).checkVisibility;
-  if (check && !check.call(el, { visibilityProperty: true, opacityProperty: true })) return false;
+  if (check && !check.call(el, { visibilityProperty: true, opacityProperty: opacity })) return false;
   const hasLayout = doc.documentElement.getBoundingClientRect().height > 0 || doc.body.getBoundingClientRect().height > 0;
   if (!hasLayout) return true;
   const rect = el.getBoundingClientRect();
@@ -70,11 +97,11 @@ function pointer(el: Element, type: string): void {
   const win = el.ownerDocument.defaultView as (Window & typeof globalThis) | null;
   const init = { ...mouseInit(el), pointerId: 1, pointerType: 'mouse', isPrimary: true };
   const Ctor = (win && 'PointerEvent' in win ? win.PointerEvent : MouseEvent) as typeof MouseEvent;
-  el.dispatchEvent(makeEvent(Ctor, type, init));
+  ours(() => el.dispatchEvent(makeEvent(Ctor, type, init)));
 }
 
 function mouse(el: Element, type: string): void {
-  el.dispatchEvent(makeEvent(MouseEvent, type, mouseInit(el)));
+  ours(() => el.dispatchEvent(makeEvent(MouseEvent, type, mouseInit(el))));
 }
 
 /** Mouse interaction split into phases, so callers can stop as soon as the widget reacts. */
@@ -100,6 +127,7 @@ export const PRESS_PHASES: ((el: Element) => void)[] = [
 export async function pressUntil(el: Element, done: () => boolean): Promise<boolean> {
   (el as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   for (const phase of PRESS_PHASES) {
+    if (aborted) return false;
     phase(el);
     await settle();
     if (done()) return true;
@@ -116,12 +144,14 @@ export function pressKey(el: Element, key: string): void {
     const code = KEY_CODES[key] ?? 0;
     Object.defineProperty(event, 'keyCode', { get: () => code });
     Object.defineProperty(event, 'which', { get: () => code });
-    el.dispatchEvent(event);
+    ours(() => el.dispatchEvent(event));
   }
 }
 
 export function fire(el: Element, ...types: string[]): void {
-  for (const type of types) el.dispatchEvent(new Event(type, { bubbles: true }));
+  ours(() => {
+    for (const type of types) el.dispatchEvent(new Event(type, { bubbles: true }));
+  });
 }
 
 /**
@@ -147,7 +177,18 @@ export function typeInto(el: HTMLInputElement | HTMLTextAreaElement, text: strin
 }
 
 export function focus(el: Element): void {
-  (el as HTMLElement).focus?.({ preventScroll: true });
+  const target = el as HTMLElement;
+  ours(() => target.focus?.({ preventScroll: true }));
+  const doc = el.ownerDocument;
+  // When the window itself is not focused (DevTools in front, another app, a background tab),
+  // Chrome moves the cursor but delivers no focus events, and libraries that open on focus never
+  // hear about it. Announce it ourselves.
+  if (!doc.hasFocus() && doc.activeElement === el) {
+    ours(() => {
+      el.dispatchEvent(new FocusEvent('focus', { bubbles: false }));
+      el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    });
+  }
 }
 
 export function blurActive(doc: Document): void {
@@ -155,11 +196,31 @@ export function blurActive(doc: Document): void {
   if (active && active !== doc.body) active.blur();
 }
 
-/** Logs to the page console when `localStorage['form-keeper:debug']` is set. For diagnosing widgets. */
+const ring: string[] = [];
+const RING_SIZE = 300;
+
+const show = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+};
+
+/**
+ * Records what a widget attempt did. The last few hundred lines are always kept (and included in
+ * "Copy diagnostics"), and echoed to the console when `localStorage['form-keeper:debug']` is set.
+ */
 export function trace(...args: unknown[]): void {
+  const line = `${new Date().toISOString().slice(11, 23)} ${args.map(show).join(' ')}`;
+  ring.push(line);
+  if (ring.length > RING_SIZE) ring.shift();
   try {
     if (globalThis.localStorage?.getItem('form-keeper:debug')) console.debug('[form-keeper:debug]', ...args);
   } catch {
-    // storage can be blocked; tracing is optional
+    // storage can be blocked; the ring buffer still has it
   }
 }
+
+export const getTrace = (): string[] => [...ring];

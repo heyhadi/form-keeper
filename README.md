@@ -105,6 +105,16 @@ become ready, so pending fields are also retried on a back-off timer. It stops a
 as soon as you start typing, so it never overwrites your input. Fields that are not
 on screen (another wizard step, a collapsed section) stay in storage instead of being dropped.
 
+**You always win.** After a reload form-keeper may spend several seconds filling dependent fields. A
+real person's interaction with a field ends that at once, aborts any dropdown it is driving, and is
+saved normally; form-keeper tells its own events apart from yours by tracking its own synchronous
+dispatches (the `change` a scripted checkbox `click()` causes is flagged trusted by the browser, so
+`isTrusted` alone is not enough). A save requested while it is mid-restore is deferred, not dropped.
+
+**Reading animated controls.** Selected text often fades in after a pick. Reading what a control
+shows ignores opacity, otherwise a choice looks empty for the first few hundred milliseconds and
+the empty value gets saved.
+
 **Forms that reset themselves.** Many apps re-initialise a form when their data arrives (Formik
 `enableReinitialize`, a refetched record), wiping what was just restored. After a successful
 restore form-keeper keeps checking for 8 seconds and puts back anything that reverted. The guard

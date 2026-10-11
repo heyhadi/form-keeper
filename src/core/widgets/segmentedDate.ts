@@ -1,5 +1,5 @@
 import type { WidgetAdapter, WriteOutcome } from '../types';
-import { focus, normalize, sleep, trace } from './interact';
+import { focus, normalize, ours, sleep, trace } from './interact';
 
 /**
  * Date/time fields split into editable sections (MUI X fields, React Aria, Spectrum...), exposed
@@ -33,11 +33,11 @@ export const segmentedDateAdapter: WidgetAdapter = {
 
     // 1. Select every section (Ctrl/Cmd+A), then paste the whole date.
     for (const type of ['keydown', 'keyup']) {
-      first.dispatchEvent(new KeyboardEvent(type, { key: 'a', code: 'KeyA', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true }));
+      ours(() => first.dispatchEvent(new KeyboardEvent(type, { key: 'a', code: 'KeyA', ctrlKey: true, metaKey: true, bubbles: true, cancelable: true })));
     }
     const data = new DataTransfer();
     data.setData('text', want);
-    first.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    ours(() => first.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })));
     await sleep(60);
     trace('segmented paste', want, '-> reads', have());
     if (have() === want) return 'restored';
@@ -46,7 +46,7 @@ export const segmentedDateAdapter: WidgetAdapter = {
     //    to the next section by itself as each one fills.
     focus(first);
     for (const ch of want.replace(/[^0-9A-Za-z]/g, '')) {
-      doc.execCommand('insertText', false, ch);
+      ours(() => doc.execCommand('insertText', false, ch));
       await sleep(25);
     }
     await sleep(60);
