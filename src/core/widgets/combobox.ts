@@ -47,7 +47,7 @@ function visibleText(el: Element): string {
   let text = '';
   const walk = (node: Node) => {
     if (node.nodeType === 3) text += node.textContent;
-    else if (node.nodeType === 1 && !(node as Element).matches(PLACEHOLDER) && isVisible(node as Element, { opacity: false })) node.childNodes.forEach(walk);
+    else if (node.nodeType === 1 && !(node as Element).matches(PLACEHOLDER) && isVisible(node as Element, { opacity: false, offscreen: true })) node.childNodes.forEach(walk);
   };
   el.childNodes.forEach(walk);
   return normalize(text);
@@ -113,7 +113,11 @@ export const ARIA_STRATEGY: Strategy = {
   snapshot: (doc) => ariaOptions(doc),
   popups: (doc) => ariaOptions(doc),
   isOpen(trigger, stale) {
-    return trigger.getAttribute('aria-expanded') === 'true' || this.options(trigger, stale).length > 0;
+    const expanded = trigger.getAttribute('aria-expanded');
+    // A control that reports its own state is believed, which also avoids scanning for options.
+    if (expanded === 'true') return true;
+    if (expanded === 'false') return false;
+    return this.options(trigger, stale).length > 0;
   },
   heldOpen: (trigger) => trigger.getAttribute('aria-expanded') === 'true',
 };
@@ -128,23 +132,29 @@ const MAX_OPTION_TEXT = 80;
  * For widgets with no standard markup: an option is any short, visible piece of text that was not
  * on screen before the control was opened, outside the control itself. Needs no roles or classes.
  */
+/** Short text in a small element: skips big containers, whose `textContent` is expensive on large pages. */
+function optionLikeText(el: HTMLElement): string | undefined {
+  if (el.childElementCount > 3) return undefined;
+  const text = normalize(el.textContent);
+  return text && text.length <= MAX_OPTION_TEXT ? text : undefined;
+}
+
 export const TEXT_STRATEGY: Strategy = {
   options(trigger, stale) {
     const doc = trigger.ownerDocument;
-    const texty = Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => {
-      if (trigger.contains(el) || el.contains(trigger) || (stale && stale.has(el)) || el.closest(NOT_AN_OPTION)) return false;
-      const text = normalize(el.textContent);
-      if (!text || text.length > MAX_OPTION_TEXT) return false;
+    return Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => {
+      if (stale && stale.has(el)) return false;
+      const text = optionLikeText(el);
+      if (!text) return false;
+      if (trigger.contains(el) || el.contains(trigger) || el.closest(NOT_AN_OPTION)) return false;
+      // An option never contains a form control or a label; a wrapper that does is just a re-rendered field.
+      if (el.querySelector('input, select, textarea, label, [role="combobox"]')) return false;
       // Innermost element carrying the text, so we click the option and not its wrapper.
       return !Array.from(el.children).some((child) => normalize(child.textContent) === text) && isVisible(el);
     });
-    return texty;
   },
   snapshot: (doc) =>
-    Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => {
-      const text = normalize(el.textContent);
-      return !!text && text.length <= MAX_OPTION_TEXT && isVisible(el) && !el.closest(NOT_AN_OPTION);
-    }),
+    Array.from(doc.querySelectorAll<HTMLElement>(TEXT_CANDIDATES)).filter((el) => !!optionLikeText(el) && isVisible(el) && !el.closest(NOT_AN_OPTION)),
   popups: () => [],
   // No aria-expanded to read: "open" means something new appeared.
   isOpen(trigger, stale) {
@@ -167,7 +177,10 @@ export const AUTO_STRATEGY: Strategy = {
   snapshot: (doc) => [...ARIA_STRATEGY.snapshot(doc), ...TEXT_STRATEGY.snapshot(doc)],
   popups: (doc) => ARIA_STRATEGY.popups(doc),
   isOpen(trigger, stale) {
-    return trigger.getAttribute('aria-expanded') === 'true' || this.options(trigger, stale).length > 0;
+    const expanded = trigger.getAttribute('aria-expanded');
+    if (expanded === 'true') return true;
+    if (expanded === 'false') return false;
+    return this.options(trigger, stale).length > 0;
   },
   heldOpen: (trigger) => ARIA_STRATEGY.heldOpen(trigger),
 };
@@ -229,14 +242,14 @@ async function open(strategy: Strategy, trigger: HTMLElement, stale: Set<Element
 }
 
 /** Waits until no option list is on screen, e.g. a previous dropdown finishing its close animation. */
-const quiet = (strategy: Strategy, doc: Document) => waitFor(() => strategy.popups(doc).length === 0, 800);
+const quiet = (strategy: Strategy, doc: Document, ms = 250) => waitFor(() => strategy.popups(doc).length === 0, ms);
 
 async function close(strategy: Strategy, trigger: HTMLElement, stale: Set<Element>): Promise<void> {
   const doc = trigger.ownerDocument;
   const open = () => strategy.isOpen(trigger, stale);
   if (!open()) return;
   pressKey(trigger, 'Escape');
-  if (await waitFor(() => !open(), 250)) return;
+  if (await waitFor(() => !open(), 120)) return;
   // Most libraries also close on a press outside, which they detect on mousedown/pointerdown.
   await pressUntil(doc.body, () => !open());
 }
@@ -261,7 +274,9 @@ async function choose(strategy: Strategy, trigger: HTMLElement, label: string, i
   trace('option found:', !!option, option ? '' : `wanted ${JSON.stringify(label)} among ${JSON.stringify(strategy.options(trigger, stale).map((o) => normalize(o.textContent)).slice(0, 15))}`);
   if (!option) return false;
   const done = () => isSelected() || !option!.isConnected || !strategy.isOpen(trigger, stale) || !isVisible(option!);
-  if (await pressUntil(option, done)) return true;
+  const pressed = await pressUntil(option, done);
+  trace('picked', pressed);
+  if (pressed) return true;
   // Some libraries only commit a choice from the keyboard: Enter on the focused option, or on
   // the trigger when the option is "active" through aria-activedescendant.
   for (const target of [option, trigger]) {
@@ -296,8 +311,13 @@ export function writeCombobox(root: HTMLElement, trigger: HTMLElement, labels: s
     // Anything on screen before we open the list belongs to something else (a stuck animation,
     // a pinned list); a list this trigger already holds open (multi-selects) is its own.
     const alreadyOpen = strategy.heldOpen(trigger);
-    if (!alreadyOpen) await quiet(strategy, doc);
-    const stale = new Set<Element>(alreadyOpen ? [] : strategy.snapshot(doc));
+    let stale = new Set<Element>();
+    if (!alreadyOpen) {
+      // The previous widget's framework may still be re-rendering; whatever it adds in the next
+      // moment is not our popup, so look only after a short pause.
+      await sleep(40);
+      stale = new Set(strategy.snapshot(doc));
+    }
 
     let found = true;
     for (const label of multiple ? missing : labels.slice(0, 1)) {
@@ -305,10 +325,10 @@ export function writeCombobox(root: HTMLElement, trigger: HTMLElement, labels: s
         found = false;
         break;
       }
-      await sleep(30);
+      if (multiple) await sleep(30);
     }
     await close(strategy, trigger, stale);
-    await quiet(strategy, doc);
+    trace('closed');
     if (!found) return 'no-option';
     const now = have();
     return labels.every((l) => now.includes(normalize(l).toLowerCase())) ? 'restored' : 'rejected';

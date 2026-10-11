@@ -261,3 +261,34 @@ test('choices made while a restore is still waiting on other fields are saved', 
   page = await reopen(context, URL);
   await expect.poll(async () => (await state(page)).antSingle, { timeout: 15_000 }).toBe('Jakarta');
 });
+
+test('a choice is kept even when the page is reloaded a moment after making it', async ({ context, worker }) => {
+  const page = await reopen(context, URL);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.waitForTimeout(300);
+  await field(page, 'Ant Select (single)').locator('.ant-select').click();
+  await antdOption(page, 'Jakarta').click();
+  // Not even the debounce has run yet.
+  await page.reload();
+  await expect.poll(async () => (await state(page)).antSingle, { timeout: 15_000 }).toBe('Jakarta');
+});
+
+test('a dropdown scrolled out of view keeps its saved value when another field is edited', async ({ context, worker }) => {
+  let page = await reopen(context, URL);
+  await expect.poll(() => badge(worker)).not.toBe('');
+  await page.waitForTimeout(300);
+  await field(page, 'Ant Select (single)').locator('.ant-select').click();
+  await antdOption(page, 'Jakarta').click();
+  await page.waitForTimeout(SETTLE_MS + 400);
+
+  // Scroll well past it, then edit a field at the bottom of the page.
+  const notes = field(page, 'Notes (contenteditable)').locator('[contenteditable]');
+  await notes.scrollIntoViewIfNeeded();
+  expect(await field(page, 'Ant Select (single)').locator('.ant-select').evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThan(0);
+  await notes.click();
+  await page.keyboard.type('scrolled past');
+  await page.waitForTimeout(SETTLE_MS + 400);
+
+  page = await reopen(context, URL);
+  await expect.poll(async () => (await state(page)).antSingle, { timeout: 15_000 }).toBe('Jakarta');
+});

@@ -2,7 +2,7 @@ import { collectFields } from './collect';
 import { captureFiles } from './files';
 import { isExcluded, isFormControl } from './filters';
 import { pageKey } from './page';
-import { abortWidgets, inOurDispatch } from './widgets/interact';
+import { abortWidgets, inOurDispatch, trace } from './widgets/interact';
 import { remapToPage } from './remap';
 import { restoreAll } from './restore';
 import { serializeForm } from './serialize';
@@ -86,7 +86,11 @@ interface PageState {
   guard?: { timer: ReturnType<typeof setTimeout>; until: number };
 }
 
-const POKE_DELAY_MS = 150;
+const POKE_DELAY_MS = 100;
+/** A second look, because a widget can finish rendering its new value after the first one. */
+const POKE_VERIFY_MS = 400;
+/** Writes that follow a click are not typing bursts, so they need no long debounce. */
+const POKE_WRITE_MS = 120;
 const SCAN_DELAY_MS = 250;
 const FIELD_SELECTOR = 'input, textarea, select, option';
 
@@ -198,19 +202,26 @@ export function startKeeper({
    * expected to differ from storage.
    */
   let pokeTimer: ReturnType<typeof setTimeout> | undefined;
+  let verifyTimer: ReturnType<typeof setTimeout> | undefined;
   function onPoke(event: Event): void {
     if (inOurDispatch() || (restoring && !event.isTrusted) || stopped) return;
     if (pokeTimer !== undefined) clearTimeout(pokeTimer);
-    // Wait for the widget to finish rendering the new value.
+    if (verifyTimer !== undefined) clearTimeout(verifyTimer);
+    // Wait for the widget to finish rendering the new value, then look once more: a reading taken
+    // too early (a value still fading or animating in) must not be the one that gets saved.
     pokeTimer = setTimeout(checkPage, POKE_DELAY_MS);
+    verifyTimer = setTimeout(() => {
+      verifyTimer = undefined;
+      checkPage();
+    }, POKE_VERIFY_MS);
   }
 
-  function checkPage(): void {
+  function checkPage(immediate = false): void {
     pokeTimer = undefined;
     if (stopped) return;
     // Our own automated interaction is still winding down: look again shortly rather than
     // dropping the change (a real person's choice must never be lost to our bookkeeping).
-    if (restoring) {
+    if (restoring && !immediate) {
       pokeTimer = setTimeout(checkPage, POKE_DELAY_MS);
       return;
     }
@@ -218,12 +229,17 @@ export function startKeeper({
     const state = current;
     // While a restore is pending the page is expected to differ from storage, so a poke would
     // save half-restored state. A person's own interaction ends the restore first (see `onUser`).
-    if (state.restore) return;
+    if (state.restore) {
+      trace('save skipped: a restore is still pending');
+      return;
+    }
     const fields = serializeForm(root);
     const json = JSON.stringify({ ...state.stored, ...fields });
     if (json === state.lastWritten) return;
+    trace('save: page changed since last write');
     state.latest = fields;
-    state.saveTimer = setTimeout(() => void writeNow(state), debounceMs);
+    if (state.saveTimer !== undefined) clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(() => void writeNow(state), Math.min(debounceMs, POKE_WRITE_MS));
   }
 
   function beginRestore(state: PageState): void {
@@ -353,7 +369,10 @@ export function startKeeper({
     if (restoring && isInsideField(event.target)) abortWidgets(true);
     // Using a field means the user is in charge: stop filling things in around them, otherwise
     // their choice would be ignored (and never saved) until the restore window ran out.
-    if (current.restore && isInsideField(event.target)) endRestore(current);
+    if (current.restore && isInsideField(event.target)) {
+      trace('restore ended: you started using a field');
+      endRestore(current);
+    }
   };
   function isInsideField(target: EventTarget | null): boolean {
     if (!target || !('nodeType' in target)) return false;
@@ -379,8 +398,21 @@ export function startKeeper({
     attributeFilter: ['disabled', 'readonly'],
   });
 
-  function onHide(): void {
-    if (root.visibilityState === 'hidden') void writeNow(current);
+  /**
+   * `visibilitychange` covers switching tabs; `pagehide` covers leaving the page, including a reload
+   * or navigation, where the tab itself stays visible. Leaving always flushes.
+   */
+  function onHide(event?: Event): void {
+    if (event?.type !== 'pagehide' && root.visibilityState !== 'hidden') return;
+    // The page is going away, maybe within a moment of the user's last click: take a final look
+    // now instead of waiting for the delayed checks, which would never run.
+    if (pokeTimer !== undefined || verifyTimer !== undefined) {
+      if (pokeTimer !== undefined) clearTimeout(pokeTimer);
+      if (verifyTimer !== undefined) clearTimeout(verifyTimer);
+      pokeTimer = verifyTimer = undefined;
+      checkPage(true);
+    }
+    void writeNow(current);
   }
 
   // Navigation API catches pushState navigations that don't touch the DOM; popstate covers
@@ -460,6 +492,7 @@ export function startKeeper({
       for (const type of ['pointerdown', 'focusin']) root.removeEventListener(type, onFirstTouch, true);
       for (const type of ['pointerdown', 'keydown']) root.removeEventListener(type, onUser, true);
       if (pokeTimer !== undefined) clearTimeout(pokeTimer);
+      if (verifyTimer !== undefined) clearTimeout(verifyTimer);
       root.removeEventListener('visibilitychange', onHide);
       win.removeEventListener('pagehide', onHide);
       win.removeEventListener('popstate', sync);

@@ -23,7 +23,7 @@ async function registerUserSites(settings: SiteSettings): Promise<void> {
       js: ['content-scripts/content.js'],
       matches,
       excludeMatches: DEV_HOST_MATCHES,
-      runAt: 'document_idle',
+      runAt: 'document_end',
       persistAcrossSessions: true,
     },
   ]);

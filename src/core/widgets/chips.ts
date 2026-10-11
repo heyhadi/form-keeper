@@ -47,7 +47,7 @@ function selectedButtons(buttons: Element[]): Element[] {
 }
 
 function buttonsOf(group: Element): HTMLElement[] {
-  return Array.from(group.children).filter((c): c is HTMLElement => c.matches(BUTTONS) && isVisible(c));
+  return Array.from(group.children).filter((c): c is HTMLElement => c.matches(BUTTONS) && isVisible(c, { offscreen: true }));
 }
 
 export const chipsAdapter: WidgetAdapter = {

@@ -133,7 +133,7 @@ export async function restoreWidgets(root: ParentNode, saved: SavedFields, cance
         outcome = 'rejected'; // a widget we misread must never break restoring the rest
       }
     }
-    trace('widget', field.key, JSON.stringify(value.kind === 'widget' ? value.labels : value), '->', outcome);
+    if (outcome !== 'unchanged') trace('widget', field.key, JSON.stringify(value.kind === 'widget' ? value.labels : value), '->', outcome);
     record(report, field.key, outcome);
   }
   return report;

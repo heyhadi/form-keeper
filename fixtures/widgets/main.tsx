@@ -47,6 +47,21 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** `?filler=4000` appends that many text-bearing elements, to see how restore copes with a large page. */
+function Filler() {
+  const n = Number(new URLSearchParams(location.search).get('filler') ?? 0);
+  if (!n) return null;
+  return (
+    <div aria-hidden={false}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="filler-row">
+          <span>Row {i}</span> <b>item {i % 7}</b> <i>value {i % 13}</i>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [rsSingle, setRsSingle] = useState<(typeof OPTIONS)[number] | null>(null);
   const [rsMulti, setRsMulti] = useState<readonly (typeof OPTIONS)[number][]>([]);
@@ -234,6 +249,7 @@ function App() {
         <h2>State</h2>
         <output data-testid="state">{JSON.stringify(state, null, 2)}</output>
       </form>
+      <Filler />
     </LocalizationProvider>
   );
 }

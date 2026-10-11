@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 import { chromium, test as base, type BrowserContext, type Worker } from '@playwright/test';
 
-const EXTENSION = resolve(import.meta.dirname, '../.output-e2e/chrome-mv3');
+/** `FK_EXT` points the tests at another build, e.g. an older release for an A/B timing comparison. */
+const EXTENSION = process.env.FK_EXT ?? resolve(import.meta.dirname, '../.output-e2e/chrome-mv3');
 export const ORIGIN = 'http://localhost:5174';
 /** Wait longer than the save debounce. */
 export const SETTLE_MS = 600;

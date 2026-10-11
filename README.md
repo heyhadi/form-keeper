@@ -117,6 +117,20 @@ saved normally; form-keeper tells its own events apart from yours by tracking it
 dispatches (the `change` a scripted checkbox `click()` causes is flagged trusted by the browser, so
 `isTrusted` alone is not enough). A save requested while it is mid-restore is deferred, not dropped.
 
+**Reading never depends on scroll position.** A dropdown scrolled above the window is still showing
+its value. Visibility checks that exist to ignore closed popups parked at negative coordinates must
+not be applied when reading what a control shows, otherwise every control you scroll past reads as
+empty and the next save overwrites its stored value. Reading ignores position and opacity; only
+popup detection uses them.
+
+**Speed.** Restoring seven dropdowns dropped from about 7.0 s to about 4.8 s from navigation start in
+an A/B run on the same page, of which roughly 2.4 s is that page's own loading. Per-dropdown
+overhead went from about 650 ms to about 200 ms: shorter settle times, no waits for popups that
+are already excluded, one "what is on screen" snapshot instead of two, `aria-expanded` trusted
+when a control reports it, text scanning that skips big containers (so a 4,000-element page no
+longer doubles the time), and start-up at `DOMContentLoaded` instead of `load`. `e2e/perf.spec.ts`
+prints the timings.
+
 **Reading animated controls.** Selected text often fades in after a pick. Reading what a control
 shows ignores opacity, otherwise a choice looks empty for the first few hundred milliseconds and
 the empty value gets saved.

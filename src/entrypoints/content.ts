@@ -31,14 +31,17 @@ export default defineContentScript({
   // Dev hosts are declared here; sites the user enables are registered at runtime by the
   // background worker, which injects this same script.
   matches: DEV_HOST_MATCHES,
-  runAt: 'document_idle',
+  // DOMContentLoaded, not `load`: a page with slow images or ads can take seconds to fire `load`,
+  // and a form that renders later is picked up by the observer anyway.
+  runAt: 'document_end',
   async main(ctx) {
     // The popup also injects this script right after a site is enabled; don't run twice.
     const scope = globalThis as { [RUNNING]?: boolean };
     if (scope[RUNNING]) return;
     scope[RUNNING] = true;
 
-    const initial = await loadSettings();
+    // Independent storage reads, started together.
+    const [initial, recipes, startPaused] = await Promise.all([loadSettings(), loadRecipes(location.origin), isPaused(location.origin)]);
     if (!isAllowedUrl(location.href, initial)) return;
     setFilesEnabled(shouldSaveFiles(location.href, initial));
     const origin = location.origin;
@@ -47,7 +50,7 @@ export default defineContentScript({
     let allowed = true;
     let stopTeaching: (() => void) | undefined;
     let banner: Banner | undefined;
-    setRecipes(await loadRecipes(origin));
+    setRecipes(recipes);
 
     function announce(status: TabStatus): void {
       const message: StatusMessage = { type: 'status', status };
@@ -180,7 +183,7 @@ export default defineContentScript({
       browser.storage.onChanged.removeListener(onStorageChange);
     });
 
-    if (await isPaused(origin)) announce(pausedStatus(origin));
+    if (startPaused) announce(pausedStatus(origin));
     else resume();
   },
 });

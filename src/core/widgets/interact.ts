@@ -29,7 +29,7 @@ export const abortWidgets = (value: boolean): void => {
 export const widgetsAborted = () => aborted;
 
 /** Polls `check` until it returns something truthy or the timeout passes. */
-export async function waitFor<T>(check: () => T | undefined | null | false, timeoutMs: number, intervalMs = 30): Promise<T | undefined> {
+export async function waitFor<T>(check: () => T | undefined | null | false, timeoutMs: number, intervalMs = 16): Promise<T | undefined> {
   const end = Date.now() + timeoutMs;
   for (;;) {
     if (aborted) return undefined;
@@ -40,8 +40,12 @@ export async function waitFor<T>(check: () => T | undefined | null | false, time
   }
 }
 
-/** Gives frameworks a moment to re-render (React flushes discrete events sync; others use rAF). */
-export const settle = () => sleep(30);
+/**
+ * Gives frameworks a moment to re-render after an event. React flushes discrete events
+ * synchronously and Vue/Svelte on a microtask, so a short pause is enough; the caller's `done()`
+ * check decides whether to wait longer.
+ */
+export const settle = () => sleep(8);
 
 export function normalize(text: string | null | undefined): string {
   return (text ?? '').replace(/[\s​]+/g, ' ').trim();
@@ -54,7 +58,7 @@ export function normalize(text: string | null | undefined): string {
  * of the window is still visible: the page can scroll to it. jsdom has no layout, so there
  * everything not explicitly hidden counts as visible.
  */
-export function isVisible(el: Element, { opacity = true }: { opacity?: boolean } = {}): boolean {
+export function isVisible(el: Element, { opacity = true, offscreen = false }: { opacity?: boolean; offscreen?: boolean } = {}): boolean {
   if (el.closest('[hidden], [aria-hidden="true"], [inert]')) return false;
   const doc = el.ownerDocument;
   const check = (el as Element & { checkVisibility?: (o: object) => boolean }).checkVisibility;
@@ -62,7 +66,10 @@ export function isVisible(el: Element, { opacity = true }: { opacity?: boolean }
   const hasLayout = doc.documentElement.getBoundingClientRect().height > 0 || doc.body.getBoundingClientRect().height > 0;
   if (!hasLayout) return true;
   const rect = el.getBoundingClientRect();
-  return rect.width > 1 && rect.height > 1 && rect.right > 0 && rect.bottom > 0;
+  if (rect.width <= 1 || rect.height <= 1) return false;
+  // Scrolled above or left of the window is not hidden: the page just moved. Only popup detection
+  // cares about "parked off-screen" (libraries hide closed popups at negative coordinates).
+  return offscreen || (rect.right > 0 && rect.bottom > 0);
 }
 
 function mouseInit(el: Element): MouseEventInit {
