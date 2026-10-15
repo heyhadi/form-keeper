@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DEFAULT_SITE_SETTINGS, siteOf, type Recipe, type SiteSettings } from '@/core';
+import { browser } from 'wxt/browser';
+import { DEFAULT_SITE_SETTINGS, siteOf, type Recipe, type SiteSettings, type UpdateCheckResult } from '@/core';
 import type { TabState } from '@/messages';
-import { bytesInUse, listPages, loadRecipes, loadRecord, loadSettings, type PageRecord, type PageSummary } from '@/storage';
+import {
+  bytesInUse,
+  checkUpdateWithCache,
+  listPages,
+  loadRecipes,
+  loadRecord,
+  loadSettings,
+  type PageRecord,
+  type PageSummary,
+} from '@/storage';
 import { getActiveTab, getTabState } from './api';
 
 export interface PopupData {
@@ -17,6 +27,7 @@ export interface PopupData {
   settings: SiteSettings;
   /** Controls taught on this site. */
   recipes: Recipe[];
+  updateInfo?: UpdateCheckResult;
 }
 
 const EMPTY: PopupData = { loading: true, pages: [], bytes: 0, settings: DEFAULT_SITE_SETTINGS, recipes: [] };
@@ -27,14 +38,27 @@ export function usePopupData() {
   const refresh = useCallback(async () => {
     const active = await getActiveTab();
     const tab = active ? await getTabState(active.id) : undefined;
-    const [record, pages, bytes, settings, recipes] = await Promise.all([
+    const currentVersion = browser.runtime?.getManifest ? browser.runtime.getManifest().version : '0.5.0';
+    const [record, pages, bytes, settings, recipes, updateInfo] = await Promise.all([
       tab ? loadRecord(tab.page) : undefined,
       listPages(),
       bytesInUse(),
       loadSettings(),
       tab ? loadRecipes(tab.origin) : Promise.resolve([]),
+      checkUpdateWithCache(currentVersion),
     ]);
-    setData({ loading: false, tabId: active?.id, site: active?.url ? siteOf(active.url) : undefined, tab, record, pages, bytes, settings, recipes });
+    setData({
+      loading: false,
+      tabId: active?.id,
+      site: active?.url ? siteOf(active.url) : undefined,
+      tab,
+      record,
+      pages,
+      bytes,
+      settings,
+      recipes,
+      updateInfo,
+    });
   }, []);
 
   useEffect(() => {

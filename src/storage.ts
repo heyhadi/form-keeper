@@ -1,15 +1,17 @@
 import { browser } from 'wxt/browser';
 import {
   areFieldsEqual,
+  checkForUpdate,
   DEFAULT_SITE_SETTINGS,
   type Recipe,
   type SavedFields,
   type SiteSettings,
   type Snapshot,
+  type UpdateCheckResult,
   type WorkingDraft,
 } from './core';
 
-export type { Snapshot, WorkingDraft };
+export type { Snapshot, UpdateCheckResult, WorkingDraft };
 
 /** Stored record for a single page: a live working draft plus point-in-time snapshots. */
 export interface PageRecord {
@@ -393,4 +395,34 @@ export async function removeRecipe(origin: string, id: string): Promise<void> {
   const key = recipesStorageKey(origin);
   if (rest.length) await browser.storage.local.set({ [key]: rest });
   else await browser.storage.local.remove(key);
+}
+
+export const UPDATE_INFO_KEY = 'update_info';
+export const DEFAULT_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export async function loadCachedUpdateInfo(): Promise<UpdateCheckResult | undefined> {
+  const stored = (await browser.storage.local.get(UPDATE_INFO_KEY))[UPDATE_INFO_KEY];
+  return stored as UpdateCheckResult | undefined;
+}
+
+export async function saveCachedUpdateInfo(info: UpdateCheckResult): Promise<void> {
+  await browser.storage.local.set({ [UPDATE_INFO_KEY]: info });
+}
+
+export async function checkUpdateWithCache(
+  currentVersion: string,
+  force = false,
+  cacheMaxAgeMs = DEFAULT_UPDATE_CHECK_INTERVAL_MS,
+  fetchFn: typeof fetch = fetch,
+): Promise<UpdateCheckResult> {
+  if (!force) {
+    const cached = await loadCachedUpdateInfo();
+    if (cached && Date.now() - cached.checkedAt < cacheMaxAgeMs) {
+      return cached;
+    }
+  }
+
+  const result = await checkForUpdate(currentVersion, fetchFn);
+  await saveCachedUpdateInfo(result);
+  return result;
 }

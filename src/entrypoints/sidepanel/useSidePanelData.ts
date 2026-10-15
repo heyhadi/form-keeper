@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import { DEFAULT_SITE_SETTINGS, siteOf, type SiteSettings } from '@/core';
+import { DEFAULT_SITE_SETTINGS, siteOf, type SiteSettings, type UpdateCheckResult } from '@/core';
 import type { TabState } from '@/messages';
 import {
   bytesInUse,
+  checkUpdateWithCache,
   listPages,
   loadSettings,
   type PageSummary,
@@ -18,6 +19,7 @@ export interface SidePanelData {
   pages: PageSummary[];
   bytes: number;
   settings: SiteSettings;
+  updateInfo?: UpdateCheckResult;
 }
 
 const EMPTY_DATA: SidePanelData = {
@@ -33,10 +35,12 @@ export function useSidePanelData() {
   const refresh = useCallback(async () => {
     const active = await getActiveTab();
     const tabState = active?.id !== undefined ? await getTabState(active.id) : undefined;
-    const [pages, bytes, settings] = await Promise.all([
+    const currentVersion = browser.runtime?.getManifest ? browser.runtime.getManifest().version : '0.5.0';
+    const [pages, bytes, settings, updateInfo] = await Promise.all([
       listPages(),
       bytesInUse(),
       loadSettings(),
+      checkUpdateWithCache(currentVersion),
     ]);
 
     setData({
@@ -47,6 +51,7 @@ export function useSidePanelData() {
       pages,
       bytes,
       settings,
+      updateInfo,
     });
   }, []);
 

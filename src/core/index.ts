@@ -33,3 +33,12 @@ export { captureFiles, filesEnabled, setFilesEnabled, MAX_FILE_BYTES, MAX_PAGE_B
 export { diagnose, withoutFileContents, type Diagnostics } from './diagnose';
 export { abortWidgets } from './widgets/interact';
 export { areFieldsEqual } from './compare';
+export {
+  checkForUpdate,
+  compareSemver,
+  GITHUB_RELEASES_PAGE,
+  GITHUB_RELEASES_URL,
+  isNewerVersion,
+  parseGitHubRelease,
+  type UpdateCheckResult,
+} from './updater';

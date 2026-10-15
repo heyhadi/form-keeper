@@ -230,3 +230,19 @@ body {
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+
+/* --- Update Banner --- */
+.update-banner { margin-bottom: 8px; }
+.update-banner-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.update-banner-text { display: flex; align-items: center; gap: 6px; }
+.update-sparkle { font-size: 14px; }
+

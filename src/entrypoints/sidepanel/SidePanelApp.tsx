@@ -209,6 +209,27 @@ export function SidePanelApp() {
       </header>
 
       <div className="sidepanel-content">
+        {data.updateInfo?.available && (
+          <div className="update-banner">
+            <div className="update-banner-card">
+              <div className="update-banner-text">
+                <span className="update-sparkle" aria-hidden>✨</span>
+                <span>
+                  <strong>v{data.updateInfo.latestVersion}</strong> available
+                </span>
+              </div>
+              <a
+                href={data.updateInfo.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-small btn-primary"
+              >
+                Update
+              </a>
+            </div>
+          </div>
+        )}
+
         {/* Active Tab Quick Action Banner */}
         {data.tabState && !data.tabState.paused && (
           <section className="active-tab-card">

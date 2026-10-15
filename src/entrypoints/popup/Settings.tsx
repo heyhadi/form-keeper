@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { DEV_HOST_MATCHES } from '@/core';
-import { saveSettings } from '@/storage';
+import { browser } from 'wxt/browser';
+import { DEV_HOST_MATCHES, type UpdateCheckResult } from '@/core';
+import { checkUpdateWithCache, saveSettings } from '@/storage';
 import { disableAllSites, disableSite, enableAllSites } from './api';
 import type { PopupData } from './usePopupData';
 
 export function Settings({ data, onChange }: { data: PopupData; onChange: () => Promise<void> }) {
   const [denied, setDenied] = useState(false);
   const [patternInput, setPatternInput] = useState('');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | undefined>(data.updateInfo);
+  const currentVersion = browser.runtime?.getManifest ? browser.runtime.getManifest().version : '0.5.0';
   const hosts = DEV_HOST_MATCHES.map((m) => m.replace('*://', '').replace('/*', ''));
   const { allSites, sites, saveFilesOnOtherSites } = data.settings;
   const patterns = data.settings.patterns ?? [];
@@ -135,6 +139,51 @@ export function Settings({ data, onChange }: { data: PopupData; onChange: () => 
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="stack-sm">
+        <h2 className="label">Version & Updates</h2>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span className="mono">v{currentVersion}</span>
+            {updateResult?.available ? (
+              <span className="small danger-text block" style={{ fontWeight: 600 }}>
+                v{updateResult.latestVersion} is available!
+              </span>
+            ) : updateResult ? (
+              <span className="muted small block">You are on the latest version.</span>
+            ) : null}
+          </div>
+          <div className="row" style={{ gap: 6 }}>
+            {updateResult?.available && (
+              <a
+                href={updateResult.releaseUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-small btn-primary"
+              >
+                View release
+              </a>
+            )}
+            <button
+              type="button"
+              className="btn btn-small"
+              disabled={checkingUpdate}
+              onClick={async () => {
+                setCheckingUpdate(true);
+                try {
+                  const res = await checkUpdateWithCache(currentVersion, true);
+                  setUpdateResult(res);
+                  await onChange();
+                } finally {
+                  setCheckingUpdate(false);
+                }
+              }}
+            >
+              {checkingUpdate ? 'Checking…' : 'Check now'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <p className="muted small">
