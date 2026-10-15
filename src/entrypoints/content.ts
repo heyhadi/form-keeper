@@ -52,19 +52,46 @@ export default defineContentScript({
     let banner: Banner | undefined;
     setRecipes(recipes);
 
+    function isContextValid(): boolean {
+      try {
+        return Boolean(browser?.runtime?.id);
+      } catch {
+        return false;
+      }
+    }
+
     function announce(status: TabStatus): void {
-      const message: StatusMessage = { type: 'status', status };
-      // Fails harmlessly if the extension was reloaded underneath this page.
-      browser.runtime.sendMessage(message).catch(() => {});
+      if (!isContextValid()) return;
+      try {
+        const message: StatusMessage = { type: 'status', status };
+        // Fails harmlessly if the extension was reloaded underneath this page.
+        browser.runtime.sendMessage(message).catch(() => {});
+      } catch {
+        // Context invalidated
+      }
     }
 
     function resume(): void {
-      if (keeper || !allowed) return;
+      if (keeper || !allowed || !isContextValid()) return;
       keeper = startKeeper({
         root: document,
         getUrl: () => location.href,
-        load: loadFields,
-        save: saveFields,
+        load: async (page) => {
+          if (!isContextValid()) return undefined;
+          try {
+            return await loadFields(page);
+          } catch {
+            return undefined;
+          }
+        },
+        save: async (page, fields) => {
+          if (!isContextValid()) return;
+          try {
+            await saveFields(page, fields);
+          } catch {
+            // Context invalidated
+          }
+        },
         onPage: (page) => {
           lastReport = undefined;
           announce(activeStatus(page));
@@ -79,7 +106,11 @@ export default defineContentScript({
 
     function halt(status: TabStatus): void {
       if (keeper) {
-        void keeper.flush();
+        try {
+          void keeper.flush();
+        } catch {
+          // Context invalidated
+        }
         keeper.stop();
         keeper = undefined;
       }
@@ -157,22 +188,26 @@ export default defineContentScript({
     }
 
     const onSubmit = async () => {
-      if (!keeper || !allowed) return;
-      await keeper.flush();
-      const page = keeper.page();
-      await createSnapshot(page, { trigger: 'submit', label: 'Form submitted' });
+      if (!isContextValid() || !keeper || !allowed) return;
+      try {
+        await keeper.flush();
+        const page = keeper.page();
+        await createSnapshot(page, { trigger: 'submit', label: 'Form submitted' });
+      } catch {
+        // Context invalidated
+      }
     };
 
     document.addEventListener('submit', onSubmit, true);
 
     const onMessage = (request: TabRequest, _sender: unknown, sendResponse: (response: unknown) => void) => {
-      if (!allowed) return false;
+      if (!allowed || !isContextValid()) return false;
       void handle(request).then(sendResponse);
       return true; // keep the channel open for the async response
     };
 
     const onStorageChange = async (changes: Record<string, { newValue?: unknown }>, area: string) => {
-      if (area !== 'local') return;
+      if (area !== 'local' || !isContextValid()) return;
       const settings = changes[SETTINGS_KEY];
       if (settings) {
         const next = { ...DEFAULT_SITE_SETTINGS, ...(settings.newValue as Partial<SiteSettings> | undefined) };
@@ -193,13 +228,19 @@ export default defineContentScript({
     browser.runtime.onMessage.addListener(onMessage);
     browser.storage.onChanged.addListener(onStorageChange);
     ctx.onInvalidated(() => {
-      stopTeaching?.();
-      banner?.remove();
-      keeper?.stop();
-      scope[RUNNING] = false;
-      browser.runtime.onMessage.removeListener(onMessage);
-      browser.storage.onChanged.removeListener(onStorageChange);
-      document.removeEventListener('submit', onSubmit, true);
+      try {
+        stopTeaching?.();
+        banner?.remove();
+        keeper?.stop();
+        scope[RUNNING] = false;
+        document.removeEventListener('submit', onSubmit, true);
+        if (isContextValid()) {
+          browser.runtime.onMessage.removeListener(onMessage);
+          browser.storage.onChanged.removeListener(onStorageChange);
+        }
+      } catch {
+        // Context invalidated
+      }
     });
 
     if (startPaused) announce(pausedStatus(origin));
