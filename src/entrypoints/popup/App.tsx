@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { browser } from 'wxt/browser';
 import { Settings } from './Settings';
 import { SavedPages } from './SavedPages';
 import { ThisPage } from './ThisPage';
@@ -26,9 +27,29 @@ export function App() {
         <h1>{view === 'settings' ? 'Sites' : 'form-keeper'}</h1>
         {view !== 'settings' && <StatusPill data={data} />}
         {view !== 'settings' && (
-          <button className="icon-btn" aria-label="Site settings" title="Where form-keeper runs" onClick={() => setView('settings')}>
-            <GearIcon />
-          </button>
+          <>
+            <button
+              className="icon-btn"
+              aria-label="Open in side panel"
+              title="Open in side panel"
+              onClick={async () => {
+                try {
+                  const win = await browser.windows.getCurrent();
+                  if (win?.id && (chrome as unknown as { sidePanel?: { open: (opt: { windowId: number }) => Promise<void> } }).sidePanel?.open) {
+                    await (chrome as unknown as { sidePanel: { open: (opt: { windowId: number }) => Promise<void> } }).sidePanel.open({ windowId: win.id });
+                    window.close();
+                  }
+                } catch {
+                  // Fallback if side panel API is not supported in environment
+                }
+              }}
+            >
+              <SidebarIcon />
+            </button>
+            <button className="icon-btn" aria-label="Site settings" title="Where form-keeper runs" onClick={() => setView('settings')}>
+              <GearIcon />
+            </button>
+          </>
         )}
       </header>
 
@@ -106,3 +127,13 @@ function GearIcon() {
     </svg>
   );
 }
+
+function SidebarIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M9 3v18" />
+    </svg>
+  );
+}
+

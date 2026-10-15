@@ -23,6 +23,20 @@ export type FieldKind = FieldValue['kind'];
 
 export type SavedFields = Record<string, FieldValue>;
 
+export interface Snapshot {
+  id: string;
+  savedAt: number;
+  fields: SavedFields;
+  label?: string;
+  pinned?: boolean;
+  trigger?: 'auto' | 'manual' | 'submit' | 'restore';
+}
+
+export interface WorkingDraft {
+  savedAt: number;
+  fields: SavedFields;
+}
+
 export type FormControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
 /** A logical field on the page. A radio group is one field backed by several inputs. */

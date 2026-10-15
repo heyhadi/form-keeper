@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { ALL_SITES_ORIGINS, sitePattern, type SiteSettings } from '@/core';
+import { ALL_SITES_ORIGINS, sitePattern, type SavedFields, type SiteSettings } from '@/core';
 import type { RestoreFromReport, TabRequest, TabResponses, TabState } from '@/messages';
 import { loadSettings, saveSettings } from '@/storage';
 
@@ -28,6 +28,14 @@ export async function getTabState(tabId: number): Promise<TabState | undefined> 
 
 export async function restoreFrom(tabId: number, page: string): Promise<RestoreFromReport | undefined> {
   return (await askTab(tabId, { type: 'restoreFrom', page })) ?? undefined;
+}
+
+export async function restoreFields(tabId: number, fields: SavedFields): Promise<RestoreFromReport | undefined> {
+  return (await askTab(tabId, { type: 'restoreFields', fields })) ?? undefined;
+}
+
+export async function takeSnapshot(tabId: number, label?: string): Promise<{ id: string } | undefined> {
+  return (await askTab(tabId, { type: 'createSnapshot', label })) ?? undefined;
 }
 
 /** Waits for the content script to answer, e.g. right after injecting it. */

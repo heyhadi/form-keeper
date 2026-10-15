@@ -1,4 +1,4 @@
-import type { Diagnostics, RestoreReport, TabStatus } from './core';
+import type { Diagnostics, RestoreReport, SavedFields, TabStatus } from './core';
 
 /** Content script -> background: update this tab's toolbar icon. */
 export interface StatusMessage {
@@ -13,6 +13,10 @@ export type TabRequest =
   | { type: 'clearPage' }
   /** Fill this page with values saved on another page. */
   | { type: 'restoreFrom'; page: string }
+  /** Fill this page with specific saved fields (e.g. from a snapshot). */
+  | { type: 'restoreFields'; fields: SavedFields }
+  /** Snapshot the current fields. */
+  | { type: 'createSnapshot'; label?: string }
   /** Start teach mode on this page (the popup closes so the user can use the page). */
   | { type: 'teach' }
   /** Describe what was found on this page, for troubleshooting. */
@@ -33,6 +37,8 @@ export interface TabResponses {
   restoreNow: RestoreReport | null;
   clearPage: null;
   restoreFrom: RestoreFromReport | null;
+  restoreFields: RestoreFromReport | null;
+  createSnapshot: { id: string } | null;
   teach: null;
   diagnose: Diagnostics;
 }

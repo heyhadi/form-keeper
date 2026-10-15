@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { DEV_HOST_MATCHES, type RestoreReport } from '@/core';
-import { removeRecipe, setPaused } from '@/storage';
-import { askTab, enableAllSites, enableSite } from './api';
+import { DEV_HOST_MATCHES, findPatternSiblings, patternOfPath, type RestoreReport, type Snapshot } from '@/core';
+import { deleteSnapshot, removeRecipe, setPaused, togglePinSnapshot } from '@/storage';
+import { askTab, enableAllSites, enableSite, restoreFields, restoreFrom, takeSnapshot } from './api';
 import { FieldList } from './FieldList';
 import { labelForKey, reasonText, splitPage, timeAgo } from './format';
 import type { PopupData } from './usePopupData';
@@ -101,6 +101,8 @@ function Active({ data, onChange }: Props) {
   const { host, path } = splitPage(tab.page);
   const fields = data.record?.fields ?? {};
   const count = Object.keys(fields).length;
+  const snapshots = data.record?.snapshots ?? [];
+  const siblings = findPatternSiblings(tab.page, data.pages, data.settings.patterns);
 
   async function restore() {
     const report = await askTab(tabId, { type: 'restoreNow' });
@@ -108,6 +110,16 @@ function Active({ data, onChange }: Props) {
     const n = report.restored.length;
     setNotice(n ? `Restored ${n} field${n === 1 ? '' : 's'}.` : 'Everything already matches.');
     await onChange();
+  }
+
+  async function snapshot() {
+    const res = await takeSnapshot(tabId);
+    if (res) {
+      setNotice('Snapshot saved.');
+      await onChange();
+    } else {
+      setNotice('Form already matches latest snapshot.');
+    }
   }
 
   async function clear() {
@@ -128,13 +140,41 @@ function Active({ data, onChange }: Props) {
 
       <section className="fields">
         <div className="section-head pad-x">
-          <h2>Saved fields{count > 0 && <span className="count">{count}</span>}</h2>
+          <h2>Working draft{count > 0 && <span className="count">{count}</span>}</h2>
           {data.record && <span className="muted small">{timeAgo(data.record.savedAt)}</span>}
         </div>
         {count === 0 ? (
-          <p className="muted pad-x empty">
-            Nothing saved yet. Start typing in a form, or fill it from another page in <em>Saved pages</em>.
-          </p>
+          <>
+            {siblings.length > 0 && (
+              <div className="pattern-suggestion pad-x">
+                <div className="pattern-suggestion-card">
+                  <div className="pattern-suggestion-head">
+                    <span className="tag">pattern match</span>
+                    <span className="mono small">{patternOfPath(path, data.settings.patterns)}</span>
+                  </div>
+                  <p className="small muted">
+                    Found saved form from <strong>{splitPage(siblings[0]!.page).path}</strong> ({timeAgo(siblings[0]!.savedAt)}).
+                  </p>
+                  <button
+                    className="btn btn-small btn-primary"
+                    onClick={async () => {
+                      const rep = await restoreFrom(tabId, siblings[0]!.page);
+                      if (rep) {
+                        const matched = rep.restored.length + rep.unchanged.length;
+                        setNotice(`Filled ${matched} fields from ${splitPage(siblings[0]!.page).path}.`);
+                        await onChange();
+                      }
+                    }}
+                  >
+                    Fill from {splitPage(siblings[0]!.page).path}
+                  </button>
+                </div>
+              </div>
+            )}
+            <p className="muted pad-x empty">
+              Nothing saved yet. Start typing in a form, or fill it from another page in <em>Saved pages</em>.
+            </p>
+          </>
         ) : (
           <FieldList fields={fields} missing={new Set(tab.report?.missing)} />
         )}
@@ -150,12 +190,17 @@ function Active({ data, onChange }: Props) {
 
       <section className="actions pad">
         <button className="btn btn-primary" disabled={count === 0} onClick={restore}>
-          Restore now
+          Restore draft
         </button>
-        <button className="btn" disabled={count === 0} onClick={clear}>
-          Clear this page
+        <button className="btn" disabled={count === 0} onClick={snapshot} title="Save a point-in-time snapshot of current form">
+          Take snapshot
+        </button>
+        <button className="btn" disabled={count === 0 && snapshots.length === 0} onClick={clear}>
+          Clear page
         </button>
       </section>
+
+      <Snapshots snapshots={snapshots} page={tab.page} tabId={tabId} onChange={onChange} onNotice={setNotice} />
 
       <Taught data={data} onChange={onChange} />
 
@@ -173,6 +218,129 @@ function Active({ data, onChange }: Props) {
     </>
   );
 }
+
+function Snapshots({
+  snapshots,
+  page,
+  tabId,
+  onChange,
+  onNotice,
+}: {
+  snapshots: Snapshot[];
+  page: string;
+  tabId: number;
+  onChange: () => Promise<void>;
+  onNotice: (msg: string) => void;
+}) {
+  const [openId, setOpenId] = useState<string>();
+
+  if (snapshots.length === 0) return null;
+
+  return (
+    <section className="snapshots pad-x">
+      <div className="section-head">
+        <h2>
+          Snapshots <span className="count">{snapshots.length}</span>
+        </h2>
+      </div>
+      <ul className="snapshot-list">
+        {snapshots.map((snap) => {
+          const isOpen = openId === snap.id;
+          const count = Object.keys(snap.fields).length;
+          return (
+            <li key={snap.id} className={`snapshot-item${isOpen ? ' is-open' : ''}`}>
+              <div className="snapshot-row">
+                <button
+                  className={`icon-btn pin-btn${snap.pinned ? ' is-pinned' : ''}`}
+                  title={snap.pinned ? 'Pinned (never pruned). Click to unpin.' : 'Pin snapshot to prevent automatic retention pruning.'}
+                  aria-label={snap.pinned ? 'Unpin snapshot' : 'Pin snapshot'}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const nowPinned = await togglePinSnapshot(page, snap.id);
+                    onNotice(nowPinned ? 'Pinned snapshot.' : 'Unpinned snapshot.');
+                    await onChange();
+                  }}
+                >
+                  <PinIcon filled={snap.pinned} />
+                </button>
+
+                <button
+                  className="snapshot-main"
+                  onClick={() => setOpenId(isOpen ? undefined : snap.id)}
+                  aria-expanded={isOpen}
+                  title="Click to view fields"
+                >
+                  <span className="snapshot-title">
+                    <span className="snapshot-label">
+                      {snap.label ?? (snap.trigger === 'submit' ? 'Submitted form' : 'Saved snapshot')}
+                    </span>
+                    {snap.trigger === 'submit' && <span className="tag-subtle">submit</span>}
+                    {snap.trigger === 'restore' && <span className="tag-subtle">pre-restore</span>}
+                  </span>
+                  <span className="muted small">
+                    {count} field{count === 1 ? '' : 's'} · {timeAgo(snap.savedAt)}
+                  </span>
+                </button>
+
+                <button
+                  className="btn btn-small"
+                  title="Restore this snapshot into the form"
+                  onClick={async () => {
+                    const rep = await restoreFields(tabId, snap.fields);
+                    if (rep) {
+                      const n = rep.restored.length;
+                      onNotice(n ? `Restored ${n} field${n === 1 ? '' : 's'} from snapshot.` : 'Form already matches this snapshot.');
+                      await onChange();
+                    }
+                  }}
+                >
+                  Restore
+                </button>
+
+                <button
+                  className="icon-btn"
+                  title="Delete snapshot"
+                  aria-label="Delete snapshot"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await deleteSnapshot(page, snap.id);
+                    if (openId === snap.id) setOpenId(undefined);
+                    onNotice('Snapshot deleted.');
+                    await onChange();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              {isOpen && <FieldList fields={snap.fields} />}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function PinIcon({ filled }: { filled?: boolean }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="12" y1="17" x2="12" y2="22" />
+      <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+    </svg>
+  );
+}
+
 
 /** Fields that were found on the page but could not be filled, and why. */
 function Problems({ report }: { report?: RestoreReport }) {

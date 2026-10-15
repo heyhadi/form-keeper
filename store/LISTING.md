@@ -33,6 +33,9 @@ WHY IT'S DIFFERENT
 • Handles dropdowns and date pickers from popular libraries (react-select, Ant Design, MUI, Radix, Headless UI, react-datepicker and more) with nothing to configure.
 • Something unusual? Press "Teach a control", use it once, and form-keeper learns how to save and restore it.
 • Remembers files and images you attach in upload fields and attaches them again after a reload, so previews come back too.
+• Snapshot history: Keeps automatic and manual snapshots alongside the live working draft, with pinning (📌) to protect important versions.
+• Chrome Side Panel: Browse, search, and preview saved drafts and snapshots in a side panel without covering the page.
+• URL pattern grouping: Collapses dynamic URL segments into route patterns (`/users/:id/edit`) and suggests filling new forms from sibling records.
 • Copes with real apps: forms that render late, options that load later, client-side navigation.
 
 SIMPLE TO USE
@@ -69,6 +72,7 @@ Save the values a user types into web forms and restore them when the page is re
 |---|---|
 | `storage` | Stores the saved form values, per-site settings and taught controls locally in the user's browser. |
 | `unlimitedStorage` | Files a user attaches to upload fields are stored locally so they can be re-attached after a reload; they exceed the default 10 MB quota quickly. Each file is capped at 8 MB and each page at 20 MB. |
+| `sidePanel` | Provides a persistent side panel interface where users can browse saved forms, inspect drafts, view snapshot history, and restore values without obscuring the active page. |
 | `activeTab` | Reads the address of the current tab when the user opens the popup, to offer "Enable on this site" and show the saved forms for that page. |
 | `scripting` | Starts the content script on a site immediately after the user enables it, so no page reload is needed; also registers it for sites the user enabled. |
 | Host permissions (content script on `localhost`, `127.0.0.1`, `*.localhost`, `*.local`) | The core function: reading and filling form fields on development sites. |

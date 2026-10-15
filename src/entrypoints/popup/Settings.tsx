@@ -6,8 +6,10 @@ import type { PopupData } from './usePopupData';
 
 export function Settings({ data, onChange }: { data: PopupData; onChange: () => Promise<void> }) {
   const [denied, setDenied] = useState(false);
+  const [patternInput, setPatternInput] = useState('');
   const hosts = DEV_HOST_MATCHES.map((m) => m.replace('*://', '').replace('/*', ''));
   const { allSites, sites, saveFilesOnOtherSites } = data.settings;
+  const patterns = data.settings.patterns ?? [];
 
   return (
     <section className="pad stack settings">
@@ -53,6 +55,62 @@ export function Settings({ data, onChange }: { data: PopupData; onChange: () => 
           </span>
         </span>
       </label>
+
+      <div className="stack-sm">
+        <h2 className="label">Custom URL patterns{patterns.length > 0 && <span className="count">{patterns.length}</span>}</h2>
+        <p className="muted small">
+          Numeric and UUID segments are automatically grouped as <code>:id</code>. Add custom route patterns to group parameterized paths.
+        </p>
+        <form
+          className="row"
+          style={{ gap: 6 }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const val = patternInput.trim();
+            if (!val) return;
+            const normalized = val.startsWith('/') ? val : `/${val}`;
+            if (!patterns.includes(normalized)) {
+              await saveSettings({ ...data.settings, patterns: [...patterns, normalized] });
+              setPatternInput('');
+              await onChange();
+            }
+          }}
+        >
+          <input
+            type="text"
+            placeholder="/orgs/:org/repos/:repo"
+            value={patternInput}
+            onChange={(e) => setPatternInput(e.target.value)}
+            aria-label="Add custom route pattern"
+            style={{ flex: 1 }}
+          />
+          <button type="submit" className="btn btn-small" disabled={!patternInput.trim()}>
+            Add
+          </button>
+        </form>
+        {patterns.length > 0 && (
+          <ul className="site-list">
+            {patterns.map((pat) => (
+              <li key={pat}>
+                <span className="mono">{pat}</span>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={async () => {
+                    await saveSettings({
+                      ...data.settings,
+                      patterns: patterns.filter((p) => p !== pat),
+                    });
+                    await onChange();
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="stack-sm">
         <h2 className="label">Enabled sites{sites.length > 0 && <span className="count">{sites.length}</span>}</h2>

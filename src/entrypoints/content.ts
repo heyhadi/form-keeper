@@ -23,7 +23,7 @@ import {
 } from '@/core';
 import type { StatusMessage, TabRequest, TabResponses } from '@/messages';
 import { createBanner, type Banner } from '@/ui/banner';
-import { addRecipe, clearPage, isPaused, loadFields, loadRecipes, loadSettings, pausedStorageKey, recipesStorageKey, saveFields, SETTINGS_KEY } from '@/storage';
+import { addRecipe, clearPage, createSnapshot, isPaused, loadFields, loadRecipes, loadSettings, pausedStorageKey, recipesStorageKey, saveFields, SETTINGS_KEY } from '@/storage';
 
 const RUNNING = Symbol.for('form-keeper.running');
 
@@ -128,6 +128,15 @@ export default defineContentScript({
           const fields = await loadFields(request.page);
           return keeper && fields ? keeper.restoreFrom(fields) : null;
         }
+        case 'restoreFields': {
+          return keeper ? keeper.restoreFrom(request.fields) : null;
+        }
+        case 'createSnapshot': {
+          if (keeper) await keeper.flush();
+          const page = keeper?.page() ?? pageKey(location.href);
+          const snap = await createSnapshot(page, { label: request.label, trigger: 'manual' });
+          return snap ? { id: snap.id } : null;
+        }
         case 'teach':
           teach();
           return null;
@@ -146,6 +155,15 @@ export default defineContentScript({
         }
       }
     }
+
+    const onSubmit = async () => {
+      if (!keeper || !allowed) return;
+      await keeper.flush();
+      const page = keeper.page();
+      await createSnapshot(page, { trigger: 'submit', label: 'Form submitted' });
+    };
+
+    document.addEventListener('submit', onSubmit, true);
 
     const onMessage = (request: TabRequest, _sender: unknown, sendResponse: (response: unknown) => void) => {
       if (!allowed) return false;
@@ -181,6 +199,7 @@ export default defineContentScript({
       scope[RUNNING] = false;
       browser.runtime.onMessage.removeListener(onMessage);
       browser.storage.onChanged.removeListener(onStorageChange);
+      document.removeEventListener('submit', onSubmit, true);
     });
 
     if (startPaused) announce(pausedStatus(origin));

@@ -9,13 +9,20 @@ export {
   ALL_SITES_ORIGINS,
   DEFAULT_SITE_SETTINGS,
   DEV_HOST_MATCHES,
+  findPatternSiblings,
+  groupPagesByPattern,
   isAllowedUrl,
   isDevHost,
+  isIdSegment,
+  matchesPattern,
   pageKey,
+  patternKey,
+  patternOfPath,
   shouldSaveFiles,
   siteOf,
   sitePattern,
   userSiteMatches,
+  type PatternGroup,
   type SiteSettings,
 } from './page';
 export { identityOf, remapToPage, type Remapped } from './remap';
@@ -25,3 +32,4 @@ export { startTeaching, type TeachResult } from './widgets/recorder';
 export { captureFiles, filesEnabled, setFilesEnabled, MAX_FILE_BYTES, MAX_PAGE_BYTES } from './files';
 export { diagnose, withoutFileContents, type Diagnostics } from './diagnose';
 export { abortWidgets } from './widgets/interact';
+export { areFieldsEqual } from './compare';

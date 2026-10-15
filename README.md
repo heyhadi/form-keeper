@@ -43,9 +43,10 @@ Works in Chrome, Edge, Brave and other Chromium browsers.
   port). Any other site is opt-in from the popup: Chrome asks for access, and only then.
 - **Shows whether it is running.** The toolbar icon is coloured with an **ON** badge (or the
   number of fields restored) where it is active, and grey everywhere else.
-- **Popup with two tabs.** *This page* lists what is saved, with **Restore now**, **Clear this
-  page** and **Pause on this site**. *Saved pages* lists every saved URL, with search, a peek at
-  the fields, delete, and **Fill here** to copy one page's values into the form you are on.
+- **Popup & Side Panel.** *This page* lists what is saved, with **Restore draft**, **Take snapshot**,
+  **Clear page** and **Pause on this site**. *Saved pages* lists every saved URL, with search, preview,
+  delete, and **Fill here**. The Chrome **Side Panel** provides a persistent view to browse, search,
+  preview drafts/snapshots, and restore into the active tab without covering the page.
 - **Tells you what it could not restore,** and why.
 - **Remembers files.** Pick a profile photo or a document, reload, and it is attached again with
   its preview. Always on for dev sites; on other sites it is a separate opt-in. Files over 8 MB
@@ -70,6 +71,7 @@ are listed in the popup and can be forgotten.
 | Permission | Why |
 |---|---|
 | `storage`, `unlimitedStorage` | Keep saved forms, and the files you attach, in your browser. |
+| `sidePanel` | Display saved forms and snapshot history in the Chrome Side Panel. |
 | Content script on `localhost`, `127.0.0.1`, `*.localhost`, `*.local` | Read and fill form fields on development sites. |
 | `activeTab` | Learn the address of the tab you open the popup on, to offer "Enable on this site". |
 | `scripting` | Start on a site the moment you enable it, without a reload. |
@@ -189,6 +191,19 @@ after opening the control", ignoring screen-reader live regions. svelte-select, 
 plain `list-item` elements with no role and no recognisable class, works this way with no special
 case.
 
+**Snapshot history.** In addition to continuous saving into a live working draft, form-keeper keeps
+point-in-time snapshots: automatically upon form submit and before restores, or on demand via the **Take
+snapshot** button. Snapshots are deduplicated against the previous snapshot to avoid storing identical states.
+An automatic retention policy keeps up to 20 unpinned snapshots per page (within 30 days), while pinned
+snapshots (📌) are protected and never pruned.
+
+**URL pattern grouping (`/users/:id/edit`).** Dynamic URL segments such as numbers (`123`), UUIDs
+(`550e8400...`), 24-character ObjectIDs, and prefixed slugs (`usr_123`) are automatically recognized and
+collapsed into route patterns (e.g. `/users/:id/edit`). Both the popup and side panel support toggling between
+a flat URL list and pattern groups. When landing on a new record whose form is empty, form-keeper detects sibling
+pages matching the same pattern and offers a one-click "Fill from sibling" prompt. Custom route patterns
+(e.g. `/teams/:team/projects/:project`) can be added in Settings.
+
 **Older libraries.** Detection does not rely on one marker. A control counts as a dropdown if it has
 the ARIA `combobox` role, an `aria-haspopup="listbox"`, an `aria-autocomplete="list"` input, or
 react-select's `react-select-N-input` id, so react-select 1 to 4, which predate the ARIA roles, work
@@ -228,18 +243,18 @@ npm run zip          # production package for the Chrome Web Store / GitHub rele
 1. ~~Save and restore native fields~~
 2. ~~Late-rendered forms, Vue/Svelte, SPA routes, active indicator, popup, custom controls~~
 3. ~~File and image inputs, rebuilt with `DataTransfer`~~
-4. Snapshot history: working draft, snapshots, dedupe, retention, pinning
-5. Side panel UI: browse, search, preview, restore
-6. URL pattern grouping (`/users/:id/edit`)
-7. Chrome Web Store listing
+4. ~~Snapshot history: working draft, snapshots, dedupe, retention, pinning~~
+5. ~~Side panel UI: browse, search, preview, restore~~
+6. ~~URL pattern grouping (`/users/:id/edit`)~~
+7. ~~Chrome Web Store listing~~ (Package built & ready in `store/LISTING.md`)
 
 ## Known limits
 
 - Fields inside shadow DOM and iframes are not captured.
 - Drop zones with no `<input type="file">` behind them (rare) are not captured; the common ones
   (react-dropzone and similar) keep a hidden input and work.
-- There is no total storage cap yet; old pages and their files are removed from the popup
-  (**Clear all**). Automatic retention arrives with the history milestone.
+- Automatic retention prunes unpinned snapshots beyond 20 per page or older than 30 days, while keeping
+  pinned snapshots and the current working draft. Old pages can also be cleared from the popup (**Clear all**).
 - Search boxes that load options from a server only restore if the option appears after the saved
   text is typed.
 - Teach mode handles dropdown-style controls; calendars and other multi-step pickers are not

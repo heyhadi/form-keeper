@@ -17,7 +17,7 @@ export default defineConfig({
     description: 'Saves what you type in forms and puts it back after a reload. Runs on dev sites by default; enable any site you choose.',
     homepage_url: 'https://github.com/heyhadi/form-keeper',
     // activeTab: read the current tab's URL when the popup opens, to offer "Enable on this site".
-    permissions: ['storage', 'unlimitedStorage', 'scripting', 'activeTab'],
+    permissions: ['storage', 'unlimitedStorage', 'scripting', 'activeTab', 'sidePanel'],
     // Requested at runtime, per site or for all sites, from the popup.
     optional_host_permissions: ['http://*/*', 'https://*/*'],
     ...(e2e && { host_permissions: ['http://*/*', 'https://*/*'] }),

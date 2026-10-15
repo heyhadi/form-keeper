@@ -324,3 +324,79 @@ h1, h2, p { margin: 0; }
 .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .thumb { width: 28px; height: 28px; border-radius: 5px; object-fit: cover; flex: none; border: 1px solid var(--border); }
 .thumb-generic { display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font: 700 9px system-ui; text-transform: uppercase; }
+
+/* --- Snapshots / History --- */
+.snapshots { padding-top: 10px; border-top: 1px solid var(--border); }
+.snapshot-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 240px; overflow-y: auto; }
+.snapshot-item { border-radius: 6px; background: var(--surface); }
+.snapshot-item.is-open { padding-bottom: 6px; }
+.snapshot-row { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
+.snapshot-main {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.snapshot-main:hover { background: color-mix(in srgb, var(--surface) 80%, black); }
+.snapshot-title { display: flex; align-items: center; gap: 6px; }
+.snapshot-label { font-weight: 550; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-btn { color: var(--muted); }
+.pin-btn.is-pinned { color: var(--accent); }
+.tag-subtle {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--grey-soft);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.snapshot-item .field-list { max-height: 140px; }
+.saved-preview { padding: 4px 0; }
+
+/* --- Pattern Grouping & Suggestions --- */
+.pattern-suggestion { margin-top: 8px; margin-bottom: 8px; }
+.pattern-suggestion-card {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+.pattern-suggestion-head { display: flex; align-items: center; gap: 8px; }
+.pattern-group-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.pattern-group-header {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.pattern-group-header:hover { background: color-mix(in srgb, var(--surface) 80%, black); }
+.pattern-group-title { font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.view-toggle-bar { display: flex; gap: 6px; padding-bottom: 8px; }
+
